@@ -793,6 +793,37 @@
         opacity: .4
       }
     }
+    /* ── MULTISELECT ── */
+    .ms-wrap { position: relative; }
+    .ms-trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 13px 14px; font-size: 15px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--surface); color: var(--text); cursor: pointer;
+      user-select: none;
+    }
+    .ms-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: calc(100% - 20px); }
+    .ms-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.12);
+      overflow: hidden;
+    }
+    .ms-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px; font-size: 14px; cursor: pointer;
+      border-bottom: 1px solid var(--border); transition: background .1s;
+    }
+    .ms-item:last-child { border-bottom: none; }
+    .ms-item:active { background: var(--surface2); }
+    .ms-check {
+      width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+      border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center;
+      background: var(--surface); transition: all .15s;
+    }
+    .ms-check.on { background: var(--accent); border-color: var(--accent); }
+    .ms-check.on::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid white; border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); }
+    
   </style>
 </head>
 
@@ -918,30 +949,40 @@
 
     <!-- HISTORIAL -->
     <div id="p-hist" class="panel">
-      <div class="filter-2">
+      <div class="filter-2" style="margin-bottom:10px">
         <div class="fg"><label>Mes</label><input type="month" id="h-mes"></div>
-        <div class="fg"><label>Categoría</label><select id="h-cat">
-            <option value="">Todas</option>
-          </select></div>
-      </div>
-      <div class="filter-2" style="margin-bottom:14px">
-        <div class="fg"><label>Persona</label>
-          <select id="h-persona">
-            <option value="">Todos</option>
-          </select>
-        </div>
         <div style="display:flex;align-items:flex-end">
           <button class="btn btn-primary btn-sm" style="width:100%;padding:12px" onclick="loadHistorial()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Filtrar
           </button>
         </div>
       </div>
+      <div class="filter-2" style="margin-bottom:14px">
+        <div class="fg" style="margin:0">
+          <label>Categoría</label>
+          <div class="ms-wrap">
+            <div class="ms-trigger" onclick="toggleMs('ms-cat')">
+              <span id="ms-cat-label">Todas</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+            </div>
+            <div class="ms-dropdown" id="ms-cat" style="display:none"></div>
+          </div>
+        </div>
+        <div class="fg" style="margin:0">
+          <label>Persona</label>
+          <div class="ms-wrap">
+            <div class="ms-trigger" onclick="toggleMs('ms-per')">
+              <span id="ms-per-label">Todos</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+            </div>
+            <div class="ms-dropdown" id="ms-per" style="display:none"></div>
+          </div>
+        </div>
+      </div>
       <div id="hist-list"></div>
     </div>
+
 
     <!-- REPORTE -->
     <div id="p-rep" class="panel">
@@ -1521,25 +1562,98 @@
     }
 
     // ─── HISTORIAL ───────────────────────────────────────────────────────────────
+    // ── MULTISELECT STATE ──
+    let msCatSel = new Set();
+    let msPerSel = new Set();
+    let msInitDone = false;
+    
+    function toggleMs(id) {
+      const el = document.getElementById(id);
+      const isOpen = el.style.display !== 'none';
+      document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+      if (!isOpen) el.style.display = 'block';
+    }
+    
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.ms-wrap')) {
+        document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+      }
+    });
+    
+    function buildMsCat() {
+      const items = categorias.map(c => c.nombre);
+      const el = document.getElementById('ms-cat');
+      el.innerHTML =
+        `<div class="ms-item" onclick="msCatToggle('__all__')">
+          <div class="ms-check ${msCatSel.size === 0 ? 'on' : ''}"></div>
+          <span style="font-weight:600">Todas</span>
+        </div>` +
+        items.map(item =>
+          `<div class="ms-item" onclick="msCatToggle('${item}')">
+            <div class="ms-check ${msCatSel.has(item) ? 'on' : ''}"></div>
+            <span>${item}</span>
+          </div>`
+        ).join('');
+      const lbl = document.getElementById('ms-cat-label');
+      if (msCatSel.size === 0) lbl.textContent = 'Todas';
+      else if (msCatSel.size === 1) lbl.textContent = [...msCatSel][0];
+      else lbl.textContent = `${msCatSel.size} categorías`;
+    }
+    
+    function msCatToggle(val) {
+      if (val === '__all__') msCatSel.clear();
+      else {
+        if (msCatSel.has(val)) msCatSel.delete(val);
+        else msCatSel.add(val);
+      }
+      buildMsCat();
+    }
+    
+    function buildMsPer() {
+      const items = [...usuarios.map(u => u.name), 'Ambos'];
+      const el = document.getElementById('ms-per');
+      el.innerHTML =
+        `<div class="ms-item" onclick="msPerToggle('__all__')">
+          <div class="ms-check ${msPerSel.size === 0 ? 'on' : ''}"></div>
+          <span style="font-weight:600">Todos</span>
+        </div>` +
+        items.map(item =>
+          `<div class="ms-item" onclick="msPerToggle('${item}')">
+            <div class="ms-check ${msPerSel.has(item) ? 'on' : ''}"></div>
+            <span>${item}</span>
+          </div>`
+        ).join('');
+      const lbl = document.getElementById('ms-per-label');
+      if (msPerSel.size === 0) lbl.textContent = 'Todos';
+      else if (msPerSel.size === 1) lbl.textContent = [...msPerSel][0];
+      else lbl.textContent = `${msPerSel.size} personas`;
+    }
+    
+    function msPerToggle(val) {
+      if (val === '__all__') msPerSel.clear();
+      else {
+        if (msPerSel.has(val)) msPerSel.delete(val);
+        else msPerSel.add(val);
+      }
+      buildMsPer();
+    }
+    
     function initHist() {
       const now = new Date();
       document.getElementById('h-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      document.getElementById('h-cat').innerHTML = '<option value="">Todas</option>' + categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-      document.getElementById('h-persona').innerHTML =
-        '<option value="">Todos</option>' +
-        usuarios.map(u =>
-          `<option value="${u.name}">${u.name}</option>`
-        ).join('');
+      if (!msInitDone) { msCatSel.clear(); msPerSel.clear(); msInitDone = true; }
+      buildMsCat();
+      buildMsPer();
     }
 
+
     function loadHistorial() {
+      document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
       const mes = document.getElementById('h-mes').value;
-      const cat = document.getElementById('h-cat').value;
-      const persona = document.getElementById('h-persona').value;
       let f = allGastos;
       if (mes) f = f.filter(g => g.fecha && g.fecha.startsWith(mes));
-      if (cat) f = f.filter(g => g.categoria === cat);
-      if (persona) f = f.filter(g => g.persona === persona);
+      if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
+      if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
       f = f.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
       const total = f.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
       document.getElementById('hist-list').innerHTML = f.length
