@@ -860,7 +860,21 @@
     .rec-actions { display: flex; gap: 6px; }
     .rec-empty { text-align: center; padding: 40px 20px; color: var(--text3); }
     
-    
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px; backdrop-filter: blur(4px);
+    }
+    .modal-card {
+      background: var(--surface); border-radius: var(--radius); padding: 24px;
+      width: 100%; max-width: 320px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+      animation: modalShow 0.3s ease-out;
+    }
+    @keyframes modalShow {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 
@@ -971,7 +985,7 @@
     <div id="p-nuevo" class="panel">
       <div class="card">
         <div class="form-2">
-          <div class="fg"><label>Fecha</label><input type="date" id="f-fecha"></div>
+          <div class="fg"><label>Fecha</label><input type="date" id="f-fecha" onclick="this.showPicker()"></div>
           <div class="fg"><label>Monto</label>
             <div style="display:flex;gap:8px">
               <input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal" style="flex:1">
@@ -1013,7 +1027,7 @@
     <div class="fg" style="margin:0">
       <label>Categoría</label>
       <div class="ms-wrap">
-        <div class="ms-trigger" onclick="toggleMs('ms-cat')">
+        <div class="ms-trigger" onclick="toggleMs('ms-cat', event)">
           <span id="ms-cat-label">Todas</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
         </div>
@@ -1027,7 +1041,7 @@
     <div class="fg" style="margin:0">
       <label>Persona</label>
       <div class="ms-wrap">
-        <div class="ms-trigger" onclick="toggleMs('ms-per')">
+        <div class="ms-trigger" onclick="toggleMs('ms-per', event)">
           <span id="ms-per-label">Todos</span>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
         </div>
@@ -1314,6 +1328,22 @@
     </button>
   </nav>
 
+  <!-- MODAL PARA FECHA DE PAGO -->
+  <div id="modal-pago" class="modal-overlay" style="display:none">
+    <div class="modal-card">
+      <div class="card-title">Confirmar fecha de pago</div>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px" id="m-pago-desc"></p>
+      <div class="fg">
+        <label>Día que se pagó</label>
+        <input type="date" id="m-fecha-pago" onclick="this.showPicker()">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-primary" style="margin:0;flex:1" onclick="confirmarPagoCuota()">Confirmar</button>
+        <button class="btn" style="margin:0;flex:1" onclick="cerrarModalPago()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // ─── CONFIG ─────────────────────────────────────────────────────────────────
     // Reemplazá estos valores con los de tu proyecto Supabase
@@ -1343,7 +1373,8 @@
       { id: 'cat-5', nombre: 'Educación', color: '#7F77DD' },
       { id: 'cat-6', nombre: 'Entretenimiento', color: '#D4537E' },
       { id: 'cat-7', nombre: 'Ropa', color: '#888780' },
-      { id: 'cat-8', nombre: 'Otros', color: '#639922' }
+      { id: 'cat-8', nombre: 'Deudas', color: '#185FA5' },
+      { id: 'cat-9', nombre: 'Otros', color: '#639922' }
     ];
     let dashMonth = new Date(); dashMonth.setDate(1);
 
@@ -1501,7 +1532,13 @@
     // ─── SUPABASE DATA ───────────────────────────────────────────────────────────
     async function loadCategorias() {
       const { data, error } = await sb.from('categorias').select('*').order('nombre');
-      if (data && data.length) categorias = data;
+      if (data && data.length) {
+        categorias = data;
+        // Asegurar que 'Deudas' esté presente si no viene de la DB
+        if (!categorias.find(c => c.nombre === 'Deudas')) {
+          categorias.push({ id: 'cat-deu', nombre: 'Deudas', color: '#185FA5' });
+        }
+      }
     }
 
     async function fetchDolar() {
@@ -1613,8 +1650,11 @@
       return (prefMoneda === 'USD' ? 'U$D ' : '$') + parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); 
     }
     function fdate(d) { return (d || '').split('-').reverse().join('/'); }
-    function catColor(nombre) { return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color; }
-    const EMOJIS = { 'Supermercado': '🛒', 'Servicios': '💡', 'Transporte': '🚗', 'Salud': '💊', 'Educación': '📚', 'Entretenimiento': '🎬', 'Ropa': '👕', 'Otros': '📦' };
+    function catColor(nombre) { 
+      if (nombre === 'Deudas') return '#185FA5';
+      return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color; 
+    }
+    const EMOJIS = { 'Supermercado': '🛒', 'Servicios': '💡', 'Transporte': '🚗', 'Salud': '💊', 'Educación': '📚', 'Entretenimiento': '🎬', 'Ropa': '👕', 'Deudas': '💳', 'Otros': '📦' };
     function catEmoji(n) { return EMOJIS[n] || '📦'; }
     function personaBadge(p) {
       const currentProfile = usuarios.find(u => u.id === currentUser.id);
@@ -1718,7 +1758,10 @@
         return g.moneda === 'USD' ? m * dolarHoy : m;
       };
 
-      const total = mg.reduce((s, g) => s + getMontoARS(g), 0);
+      const ym = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}`;
+      const totalGastos = mg.reduce((s, g) => s + getMontoARS(g), 0);
+      const totalCuotas = getCuotasMes(ym);
+      const total = totalGastos + totalCuotas;
 
       const currentProfile = usuarios.find(u => u.id === currentUser?.id);
       const miNombre = currentProfile?.name || '';
@@ -1735,8 +1778,16 @@
 
       document.getElementById('dash-metrics').innerHTML = `
       <div class="metric" style="grid-column:1/-1">
-        <div class="metric-label">Total del mes (${prefMoneda})</div>
+        <div class="metric-label">Total del mes (Gastos + Pendientes)</div>
         <div class="metric-value">${fmt(total)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Gastos del mes</div>
+        <div class="metric-value">${fmt(totalGastos)}</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Cuotas pendientes</div>
+        <div class="metric-value" style="color:var(--text3)">${fmt(totalCuotas)}</div>
       </div>
       <div class="metric">
         <div class="metric-label">${miNombre || 'Yo'}</div>
@@ -1778,7 +1829,7 @@
       const recent = mg.slice(0, 5);
       document.getElementById('dash-recent').innerHTML = recent.length
         ? recent.map(g => `<div class="tx-item">
-        <div class="tx-dot" style="background:${catColor(g.categoria)}22">${catEmoji(g.categoria)}</div>
+        <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
         <div class="tx-info">
           <div class="tx-desc">${g.descripcion || g.categoria}</div>
           <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}</div>
@@ -1887,15 +1938,27 @@
       const el = document.getElementById(id);
       const isOpen = el.style.display !== 'none';
       
-      // Cerramos otros dropdowns antes de abrir el actual
-      document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+      // Cerramos otros dropdowns
+      document.querySelectorAll('.ms-dropdown').forEach(d => {
+        if (d.id !== id) d.style.display = 'none';
+      });
       
-      if (!isOpen) el.style.display = 'block';
+      el.style.display = isOpen ? 'none' : 'block';
     }
     
+    // Un solo listener global optimizado
     document.addEventListener('click', e => {
       if (!e.target.closest('.ms-wrap')) {
-        document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+        const drops = document.querySelectorAll('.ms-dropdown');
+        let anyOpen = false;
+        drops.forEach(d => { if(d.style.display !== 'none') anyOpen = true; });
+        
+        if (anyOpen) {
+          // Usamos requestAnimationFrame para no interferir con el foco inmediato de otros campos
+          requestAnimationFrame(() => {
+            drops.forEach(d => d.style.display = 'none');
+          });
+        }
       }
     });
     
@@ -1959,12 +2022,7 @@
       buildMsPer();
     }
     
-    // Escuchador global para cerrar solo cuando se toca realmente "afuera"
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.ms-wrap')) {
-        document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
-      }
-    });
+    // El listener anterior fue unificado y movido arriba
     
     function initHist() {
       const now = new Date();
@@ -1994,7 +2052,7 @@
       document.getElementById('hist-list').innerHTML = f.length
         ? `<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${f.length} gastos · <strong>${fmt(total)}</strong></div>` +
         f.map(g => `<div class="tx-item">
-        <div class="tx-dot" style="background:${catColor(g.categoria)}22">${catEmoji(g.categoria)}</div>
+        <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
         <div class="tx-info">
           <div class="tx-desc">${g.descripcion || g.categoria}</div>
           <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
@@ -2347,15 +2405,64 @@
       showToast('Deuda eliminada');
     }
 
+    let deudaEnPago = null;
+
+    function cerrarModalPago() {
+      document.getElementById('modal-pago').style.display = 'none';
+      deudaEnPago = null;
+    }
+
     async function pagarCuota(id) {
       const d = allDeudas.find(x => x.id === id);
       if (!d) return;
+      
+      deudaEnPago = d;
+      document.getElementById('m-pago-desc').textContent = d.descripcion;
+      document.getElementById('m-fecha-pago').value = new Date().toISOString().split('T')[0];
+      document.getElementById('modal-pago').style.display = 'flex';
+    }
+
+    async function confirmarPagoCuota() {
+      if (!deudaEnPago) return;
+      const d = deudaEnPago;
+      const fechaPago = document.getElementById('m-fecha-pago').value;
+      if (!fechaPago) { showToast('Seleccioná la fecha', 'err'); return; }
+
+      cerrarModalPago();
+
       const nuevasPagas = (d.cuotas_pagas || 0) + 1;
-      const { error } = await sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', id);
-      if (error) { showToast('Error', 'err'); return; }
+      
+      showToast('Procesando pago...', 'info');
+      
+      // 1. Actualizar la deuda
+      const { error: errorDeuda } = await sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id);
+      if (errorDeuda) { showToast('Error al actualizar deuda', 'err'); return; }
+      
+      // 2. Crear un gasto automático para que se vea en el dashboard
+      const gasto = {
+        fecha: fechaPago,
+        monto: d.monto_cuota,
+        moneda: d.moneda,
+        categoria: 'Deudas',
+        persona: d.persona,
+        descripcion: `Pago Cuota ${nuevasPagas}/${d.cuotas_total}: ${d.descripcion}`,
+        notas: `Pago de cuota de ${d.tarjeta}. Deuda ID: ${d.id}`,
+        user_id: currentUser.id,
+        user_email: currentUser.email
+      };
+      
+      const { error: errorGasto } = await sb.from('gastos').insert([gasto]);
+      
+      if (errorGasto) {
+        showToast('Cuota marcada, pero no se pudo crear el gasto', 'warn');
+      } else {
+        showToast('Cuota pagada y registrada en gastos ✓');
+      }
+
       d.cuotas_pagas = nuevasPagas;
+      await loadGastos(); // Recargar para que aparezca en el dash
       renderDeudas();
-      showToast('Cuota marcada como paga ✓');
+      renderDash();
     }
 
     function getCuotasMes(yearMonth) {
@@ -2366,13 +2473,20 @@
         const inicio = new Date(y, m-1, 1);
         const [ty, tm] = yearMonth.split('-').map(Number);
         const target = new Date(ty, tm-1, 1);
-        const diffMs = target - inicio;
-        const diffMonths = Math.round(diffMs / (1000*60*60*24*30.44));
-        const cuotasPagas = d.cuotas_pagas || 0;
+        
+        // Diferencia en meses
+        const diffMonths = (target.getFullYear() - inicio.getFullYear()) * 12 + (target.getMonth() - inicio.getMonth());
+        
         const cuotasTotal = d.cuotas_total || 1;
-        const cuotaNum = diffMonths; // cuota 0 = primer mes
-        if (cuotaNum >= cuotasPagas && cuotaNum < cuotasTotal) {
-          return total + parseFloat(d.monto_cuota || 0);
+        
+        if (diffMonths >= 0 && diffMonths < cuotasTotal) {
+          // Solo sumamos si esta cuota aún no fue pagada
+          // diffMonths es el índice de la cuota (0 para el primer mes)
+          // Si cuotas_pagas es 1, significa que la cuota 0 ya se pagó.
+          if (diffMonths >= (d.cuotas_pagas || 0)) {
+            const montoARS = d.moneda === 'USD' ? d.monto_cuota * dolarHoy : d.monto_cuota;
+            return total + parseFloat(montoARS || 0);
+          }
         }
         return total;
       }, 0);
