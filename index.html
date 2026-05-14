@@ -13,6 +13,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg: #f5f5f0;
@@ -849,6 +850,18 @@
     .ms-check.on { background: var(--accent); border-color: var(--accent); }
     .ms-check.on::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid white; border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); }
     
+    /* ── CHART ── */
+    .chart-container { position: relative; height: 180px; width: 100%; margin-top: 10px; }
+    
+    /* ── RECURRENTES ── */
+    .rec-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 8px; }
+    .rec-info { flex: 1; }
+    .rec-name { font-size: 14px; font-weight: 700; }
+    .rec-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .rec-actions { display: flex; gap: 6px; }
+    .rec-empty { text-align: center; padding: 40px 20px; color: var(--text3); }
+    
+    
   </style>
 </head>
 
@@ -934,7 +947,17 @@
       </div>
       <div class="realtime-indicator"><span class="rt-dot"></span><span>Sincronización en tiempo real</span></div>
       <div class="metrics" id="dash-metrics"></div>
+      
+      <!-- NUEVO: Gráfico de Evolución -->
+      <div class="card" id="evolution-card">
+        <div class="card-title">Evolución de Gastos (12 meses)</div>
+        <div class="chart-container">
+          <canvas id="evolutionChart"></canvas>
+        </div>
+      </div>
+
       <div class="card">
+
         <div class="card-title">Por categoría</div>
         <div id="dash-cats"></div>
       </div>
@@ -949,9 +972,17 @@
     <div id="p-nuevo" class="panel">
       <div class="card">
         <div class="form-2">
-          <div class="fg"><label>Fecha</label><input type="date" id="f-fecha"></div>
+        <div class="fg"><label>Fecha</label><input type="date" id="f-fecha"></div>
+        <div class="form-2">
           <div class="fg"><label>Monto $</label><input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01"
               inputmode="decimal"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="f-moneda">
+              <option value="ARS">$ Pesos</option>
+              <option value="USD">U$D Dólares</option>
+            </select>
+          </div>
+        </div>
         </div>
         <div class="form-2">
           <div class="fg"><label>Categoría</label><select id="f-cat"></select></div>
@@ -1118,16 +1149,78 @@
       </div>
     </div>
 
+    <!-- GASTOS RECURRENTES -->
+    <div id="p-rec" class="panel">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Gastos Fijos / Mensuales</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-green btn-sm" id="btn-cargar-todo" onclick="cargarTodosRecurrentes()" style="margin:0">Cargar todo</button>
+            <button class="btn btn-primary btn-sm" onclick="showFormRec()" style="margin:0">+ Nuevo</button>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px">Configurá gastos que se repiten siempre (Netflix, Gym, etc.) y cargalos con un toque cada mes.</p>
+        <div id="rec-lista"></div>
+      </div>
+
+      <!-- Formulario Nuevo Recurrente -->
+      <div class="card" id="rec-form" style="display:none">
+        <div class="card-title">Nuevo Gasto Fijo</div>
+        <div class="fg"><label>Descripción</label><input type="text" id="rf-desc" placeholder="Ej: Netflix, Expensas..."></div>
+        <div class="form-2">
+          <div class="fg"><label>Monto $</label><input type="number" id="rf-monto" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="rf-moneda">
+              <option value="ARS">$ Pesos</option>
+              <option value="USD">U$D Dólares</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-2">
+          <div class="fg"><label>¿Quién paga siempre?</label><select id="rf-persona"></select></div>
+          <div class="fg"><label>Categoría</label><select id="rf-cat"></select></div>
+        </div>
+
+
+        <button class="btn btn-primary" id="rf-save-btn" onclick="saveRecurrente()">Guardar</button>
+        <button class="btn" onclick="hideFormRec()">Cancelar</button>
+      </div>
+    </div>
+
+
     <!-- CONFIG -->
     <div id="p-cfg" class="panel">
-      <div class="section-lbl">Categorías</div>
+      <div class="section-lbl">Preferencias Visuales</div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:14px">Moneda de Consolidación</span>
+          <select id="pref-moneda" onchange="updatePrefMoneda(this.value)" style="width:120px;padding:6px;font-size:13px">
+            <option value="ARS">Pesos (ARS)</option>
+            <option value="USD">Dólares (USD)</option>
+          </select>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:8px">Toda la app se mostrará en esta moneda usando el tipo de cambio del día.</p>
+      </div>
+
+      <div class="section-lbl">Categorías y Presupuesto</div>
       <div class="card">
         <div id="cfg-cats"></div>
-        <div class="add-cat-row">
-          <input type="text" id="new-cat" placeholder="Nueva categoría...">
-          <input type="color" class="color-pick" id="new-cat-color" value="#1D9E75">
-          <button class="btn btn-primary btn-sm" onclick="addCategoria()">+</button>
+        <div class="add-cat-row" style="flex-direction:column;align-items:stretch">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="new-cat" placeholder="Nombre..." style="flex:2">
+            <input type="color" class="color-pick" id="new-cat-color" value="#1D9E75">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="number" id="new-cat-ppto" placeholder="Presupuesto mensual $" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="addCategoria()" style="width:42px">+</button>
+          </div>
         </div>
+      </div>
+
+      <div class="section-lbl">Configuración de Tarjetas</div>
+      <div class="card">
+        <div id="cfg-tarjetas"></div>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px">Establece el día de cierre para que la app calcule tus consumos próximos.</p>
       </div>
 
       <div class="section-lbl">Mi cuenta</div>
@@ -1207,7 +1300,14 @@
       </svg>
       <span>Deudas</span>
     </button>
+    <button class="nav-btn" id="nb-rec" onclick="switchTab('rec')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+      </svg>
+      <span>Fijos</span>
+    </button>
     <button class="nav-btn" id="nb-cfg" onclick="switchTab('cfg')">
+
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <circle cx="12" cy="12" r="3" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
@@ -1228,6 +1328,14 @@
 
     const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     let allGastos = [];
+    let allRecurrentes = [];
+    let dolarHoy = 1200; 
+    let prefMoneda = localStorage.getItem('prefMoneda') || 'ARS';
+    let tarjetasCfg = [
+      { tarjeta: 'Visa', dia_cierre: 15, dia_vencimiento: 25 },
+      { tarjeta: 'Mastercard', dia_cierre: 20, dia_vencimiento: 30 },
+      { tarjeta: 'Amex', dia_cierre: 10, dia_vencimiento: 20 }
+    ];
     let usuarios = [];
     let categorias = [
       { id: 'cat-1', nombre: 'Supermercado', color: '#1D9E75' },
@@ -1287,6 +1395,10 @@
       await loadUsuarios();
       await loadGastos();
       await loadDeudas();
+      await loadRecurrentes();
+      await loadTarjetasConfig();
+      document.getElementById('pref-moneda').value = prefMoneda;
+      fetchDolar();
       // Realtime desactivado - usando polling
       startPolling();
       initForm();
@@ -1394,6 +1506,38 @@
       if (data && data.length) categorias = data;
     }
 
+    async function fetchDolar() {
+      try {
+        const res = await fetch('https://dolarapi.com/v1/dolares/blue');
+        const data = await res.json();
+        if (data && data.compra) {
+          dolarHoy = data.compra;
+          renderDash();
+          renderDeudas();
+        }
+      } catch (e) { console.error('Error fetching dolar', e); }
+    }
+
+    async function loadTarjetasConfig() {
+      const { data, error } = await sb.from('tarjetas_config').select('*');
+      if (data && data.length) tarjetasCfg = data;
+    }
+
+    async function saveTarjetaConfig(tarjeta, dia_cierre) {
+      const { error } = await sb.from('tarjetas_config').upsert({ 
+        tarjeta, 
+        dia_cierre: parseInt(dia_cierre),
+        user_id: currentUser.id 
+      }, { onConflict: 'tarjeta' });
+      
+      if (error) showToast('Error al guardar config de tarjeta', 'err');
+      else {
+        await loadTarjetasConfig();
+        renderDeudas();
+        showToast('Configuración de tarjeta guardada ✓');
+      }
+    }
+
     async function loadUsuarios() {
       const { data, error } = await sb
         .from('profiles')
@@ -1405,7 +1549,11 @@
 
     async function loadGastos() {
       const { data, error } = await sb.from('gastos').select('*').order('fecha', { ascending: false });
-      if (data) { allGastos = data; renderDash(); }
+      if (data) { 
+        allGastos = data; 
+        renderDash(); 
+        renderEvolutionChart();
+      }
     }
 
     async function saveGastoToDB(gasto) {
@@ -1462,7 +1610,10 @@
     function subscribeRealtime() { startPolling(); }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────────
-    function fmt(n) { return '$' + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function fmt(n) { 
+      const val = prefMoneda === 'USD' ? (n / dolarHoy) : n;
+      return (prefMoneda === 'USD' ? 'U$D ' : '$') + parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); 
+    }
     function fdate(d) { return (d || '').split('-').reverse().join('/'); }
     function catColor(nombre) { return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color; }
     const EMOJIS = { 'Supermercado': '🛒', 'Servicios': '💡', 'Transporte': '🚗', 'Salud': '💊', 'Educación': '📚', 'Entretenimiento': '🎬', 'Ropa': '👕', 'Otros': '📦' };
@@ -1475,12 +1626,30 @@
 
       if (p === miNombre) {
         cls = 'b-yo';
-      } else if (p !== 'Ambos') {
+      } else if (p !== 'Ambos' && p !== '') {
         cls = 'b-senora';
       }
 
-      return `<span class="badge ${cls}">${p}</span>`;
+      return `<span class="badge ${cls}">${p || 'Ambos'}</span>`;
     }
+
+    function fmtGasto(n, moneda) {
+      let finalVal = n;
+      if (moneda === 'USD' && prefMoneda === 'ARS') finalVal = n * dolarHoy;
+      if (moneda === 'ARS' && prefMoneda === 'USD') finalVal = n / dolarHoy;
+      
+      const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
+      const res = symbol + parseFloat(finalVal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      // Mostrar el original en un tooltip pequeño si es diferente a la moneda de consolidación
+      if (moneda !== prefMoneda) {
+        const origSymbol = moneda === 'USD' ? 'U$D ' : '$';
+        const orig = origSymbol + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return `${res} <span style="font-size:10px;font-weight:400;color:var(--text3);display:block">Original: ${orig}</span>`;
+      }
+      return res;
+    }
+
 
     // ─── TABS ────────────────────────────────────────────────────────────────────
     function switchTab(t) {
@@ -1492,6 +1661,7 @@
       if (t === 'nuevo') initForm();
       if (t === 'hist') { initHist(); loadHistorial(); }
       if (t === 'deu') renderDeudas();
+      if (t === 'rec') renderRecurrentes();
       if (t === 'cfg') renderConfig();
     }
 
@@ -1541,26 +1711,32 @@
     function renderDash() {
       const mg = getMonthGastos();
       renderDashDeudas();
+      renderEvolutionChart();
       document.getElementById('dash-month').textContent = `${MESES[dashMonth.getMonth()]} ${dashMonth.getFullYear()}`;
-      const total = mg.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+      
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      const total = mg.reduce((s, g) => s + getMontoARS(g), 0);
 
       const currentProfile = usuarios.find(u => u.id === currentUser?.id);
       const miNombre = currentProfile?.name || '';
-      // Nombre de la pareja: primer usuario que NO sea yo
       const parejaProfile = usuarios.find(u => u.id !== currentUser?.id);
       const parejaNombre = parejaProfile?.name || 'Pareja';
 
       const yo = mg
         .filter(g => g.persona === miNombre)
-        .reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+        .reduce((s, g) => s + getMontoARS(g), 0);
 
       const pareja = mg
         .filter(g => g.persona !== miNombre && g.persona !== 'Ambos')
-        .reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+        .reduce((s, g) => s + getMontoARS(g), 0);
 
       document.getElementById('dash-metrics').innerHTML = `
       <div class="metric" style="grid-column:1/-1">
-        <div class="metric-label">Total del mes</div>
+        <div class="metric-label">Total del mes (${prefMoneda})</div>
         <div class="metric-value">${fmt(total)}</div>
       </div>
       <div class="metric">
@@ -1573,18 +1749,33 @@
       </div>
       `;
       const catMap = {};
-      mg.forEach(g => { catMap[g.categoria] = (catMap[g.categoria] || 0) + parseFloat(g.monto || 0); });
+      mg.forEach(g => { 
+        const montoARS = getMontoARS(g);
+        catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+      });
+
       const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
-      const maxV = sorted[0]?.[1] || 1;
+      
       document.getElementById('dash-cats').innerHTML = sorted.length
-        ? sorted.map(([cat, val]) => `<div class="cat-row">
-        <div class="cat-row-head">
-          <span class="cat-name"><span class="cat-dot" style="background:${catColor(cat)}"></span>${cat}</span>
-          <span class="cat-val">${fmt(val)} <span style="color:var(--text3);font-size:11px;font-weight:400">${Math.round(val / total * 100)}%</span></span>
-        </div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${val / maxV * 100}%;background:${catColor(cat)}"></div></div>
-      </div>`).join('')
+        ? sorted.map(([cat, val]) => {
+            const cInfo = categorias.find(c => c.nombre === cat) || {};
+            const ppto = parseFloat(cInfo.presupuesto || 0);
+            const pct = ppto > 0 ? Math.round((val / ppto) * 100) : 0;
+            const barColor = (ppto > 0 && val > ppto) ? 'var(--red)' : catColor(cat);
+            
+            return `<div class="cat-row">
+            <div class="cat-row-head">
+              <span class="cat-name"><span class="cat-dot" style="background:${catColor(cat)}"></span>${cat}</span>
+              <span class="cat-val">${fmt(val)} ${ppto > 0 ? `<span style="color:var(--text3);font-size:11px;font-weight:400">/ ${fmt(ppto)}</span>` : ''}</span>
+            </div>
+            <div class="bar-bg">
+              <div class="bar-fill" style="width:${ppto > 0 ? Math.min(pct, 100) : (val / (sorted[0][1] || 1) * 100)}%;background:${barColor}"></div>
+            </div>
+            ${ppto > 0 ? `<div style="font-size:10px;text-align:right;margin-top:2px;color:${val > ppto ? 'var(--red)' : 'var(--text2)'}">${pct}% del presupuesto</div>` : ''}
+          </div>`;
+        }).join('')
         : '<div class="empty"><div class="empty-icon">📊</div>Sin gastos en este mes</div>';
+
       const recent = mg.slice(0, 5);
       document.getElementById('dash-recent').innerHTML = recent.length
         ? recent.map(g => `<div class="tx-item">
@@ -1594,9 +1785,10 @@
           <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}</div>
         </div>
         <div class="tx-right">
-          <div class="tx-amount">${fmt(g.monto)}</div>
+          <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
           <div class="tx-date">${fdate(g.fecha)}</div>
         </div>
+
       </div>`).join('')
         : '<div class="empty"><div class="empty-icon">🧾</div>Sin gastos recientes</div>';
     }
@@ -1605,24 +1797,15 @@
     function initForm() {
       const now = new Date();
       document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
-
-      document.getElementById('f-cat').innerHTML =
-        categorias.map(c =>
-          `<option value="${c.nombre}">${c.nombre}</option>`
-        ).join('');
-
-      const personaSelect = document.getElementById('f-persona');
-
-      personaSelect.innerHTML =
-        usuarios.map(u =>
-          `<option value="${u.name}">${u.name}</option>`
-        ).join('') +
-        `<option value="Ambos">Ambos</option>`;
+      
+      document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+      document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+      
+      document.getElementById('f-moneda').value = prefMoneda;
 
       const currentProfile = usuarios.find(u => u.id === currentUser.id);
-
       if (currentProfile) {
-        personaSelect.value = currentProfile.name;
+        document.getElementById('f-persona').value = currentProfile.name;
       }
     }
 
@@ -1638,6 +1821,7 @@
       const fecha = document.getElementById('f-fecha').value;
       const montoRaw = document.getElementById('f-monto').value;
       const monto = parseFloat(montoRaw);
+      const moneda = document.getElementById('f-moneda').value;
       const cat = document.getElementById('f-cat').value;
       const persona = document.getElementById('f-persona').value;
       const desc = document.getElementById('f-desc').value.trim();
@@ -1662,7 +1846,7 @@
       try {
         // Optimistic UI: agregar localmente de inmediato
         const id_temp = 'tmp_' + Date.now();
-        const gasto = { id: id_temp, fecha, monto, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+        const gasto = { id: id_temp, fecha, monto, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
         allGastos.unshift(gasto);
         renderDash();
 
@@ -1800,7 +1984,14 @@
       if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
       if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
       f = f.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
-      const total = f.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+      
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      const total = f.reduce((s, g) => s + getMontoARS(g), 0);
+
       document.getElementById('hist-list').innerHTML = f.length
         ? `<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${f.length} gastos · <strong>${fmt(total)}</strong></div>` +
         f.map(g => `<div class="tx-item">
@@ -1810,10 +2001,11 @@
           <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
         </div>
         <div class="tx-right">
-          <div class="tx-amount">${fmt(g.monto)}</div>
+          <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
           <div class="tx-date">${fdate(g.fecha)}</div>
           <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
         </div>
+
       </div>`).join('')
         : '<div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div>';
     }
@@ -1853,9 +2045,18 @@
       const { list, label } = r;
       const div = document.getElementById('rep-preview');
       if (!list.length) { div.innerHTML = '<div class="empty">Sin datos para el período</div>'; return; }
-      const total = list.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+      
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      const total = list.reduce((s, g) => s + getMontoARS(g), 0);
       const catMap = {};
-      list.forEach(g => { catMap[g.categoria] = (catMap[g.categoria] || 0) + parseFloat(g.monto || 0); });
+      list.forEach(g => { 
+        const montoARS = getMontoARS(g);
+        catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+      });
       div.innerHTML = `<div class="rep-total"><span>${label} · ${list.length} gastos</span><span>${fmt(total)}</span></div>` +
         Object.entries(catMap).sort((a, b) => b[1] - a[1]).map(([c, v]) => `
       <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
@@ -1864,8 +2065,8 @@
       </div>`).join('') +
         `<div class="rep-scroll" style="margin-top:14px"><table>
       <tr><th>Fecha</th><th>Descripción</th><th>Cat.</th><th>Quién</th><th style="text-align:right">Monto</th></tr>
-      ${list.map(g => `<tr><td style="white-space:nowrap">${fdate(g.fecha)}</td><td>${g.descripcion || '-'}</td><td>${g.categoria}</td><td>${g.persona}</td><td style="text-align:right;font-weight:600">${fmt(g.monto)}</td></tr>`).join('')}
-      <tr><td colspan="4">TOTAL</td><td style="text-align:right">${fmt(total)}</td></tr>
+      ${list.map(g => `<tr><td style="white-space:nowrap">${fdate(g.fecha)}</td><td>${g.descripcion || '-'}</td><td>${g.categoria}</td><td>${g.persona}</td><td style="text-align:right;font-weight:600">${fmtGasto(g.monto, g.moneda)}</td></tr>`).join('')}
+      <tr><td colspan="4">TOTAL (${prefMoneda})</td><td style="text-align:right">${fmt(total)}</td></tr>
     </table></div>`;
     }
 
@@ -1874,11 +2075,34 @@
       const { list, label } = r;
       if (!list.length) { showToast('Sin datos', 'err'); return; }
       const wb = XLSX.utils.book_new();
-      const data = [['Fecha', 'Descripción', 'Categoría', 'Persona', 'Monto ($)', 'Notas']];
-      list.forEach(g => data.push([fdate(g.fecha), g.descripcion || '', g.categoria, g.persona, parseFloat(g.monto), g.notas || '']));
-      data.push(['', '', '', 'TOTAL', list.reduce((s, g) => s + parseFloat(g.monto || 0), 0), '']);
+      const data = [['Fecha', 'Descripción', 'Categoría', 'Persona', `Monto (${prefMoneda})`, 'Notas', 'Moneda Original', 'Monto Original']];
+      
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      list.forEach(g => {
+        const montoConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+        data.push([
+          fdate(g.fecha), 
+          g.descripcion || '', 
+          g.categoria, 
+          g.persona, 
+          montoConsolidado, 
+          g.notas || '', 
+          g.moneda || 'ARS', 
+          parseFloat(g.monto)
+        ]);
+      });
+
+      const totalARS = list.reduce((s, g) => s + getMontoARS(g), 0);
+      const totalConsolidado = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+      
+      data.push(['', '', '', 'TOTAL CONSOLIDADO', totalConsolidado, '', prefMoneda, '']);
+      
       const ws = XLSX.utils.aoa_to_sheet(data);
-      ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 25 }];
+      ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
       XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
       XLSX.writeFile(wb, `Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.xlsx`);
       showToast('Excel exportado ✓');
@@ -1893,23 +2117,45 @@
       doc.setFontSize(16); doc.setFont('helvetica', 'bold');
       doc.text('Reporte de Gastos Familiares', 14, 18);
       doc.setFontSize(11); doc.setFont('helvetica', 'normal');
-      doc.text(`Período: ${label}`, 14, 27);
-      const total = list.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+      doc.text(`Período: ${label} (Consolidado en ${prefMoneda})`, 14, 27);
+
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      const totalARS = list.reduce((s, g) => s + getMontoARS(g), 0);
       const catMap = {};
-      list.forEach(g => { catMap[g.categoria] = (catMap[g.categoria] || 0) + parseFloat(g.monto || 0); });
+      list.forEach(g => { 
+        const montoARS = getMontoARS(g);
+        catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+      });
+
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('Resumen por categoría', 14, 38);
       let y = 45;
       Object.entries(catMap).sort((a, b) => b[1] - a[1]).forEach(([c, v]) => {
         doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-        doc.text(`${c}: $${parseFloat(v).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 18, y); y += 6;
+        doc.text(`${c}: ${fmt(v)}`, 18, y); y += 6;
       });
+
       y += 4; doc.setFont('helvetica', 'bold');
-      doc.text(`TOTAL: $${parseFloat(total).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`, 14, y); y += 10;
+      doc.text(`TOTAL GENERAL: ${fmt(totalARS)}`, 14, y); y += 10;
+
       doc.autoTable({
-        head: [['Fecha', 'Descripción', 'Categoría', 'Persona', 'Monto ($)']],
-        body: list.map(g => [fdate(g.fecha), g.descripcion || '', g.categoria, g.persona, '$' + parseFloat(g.monto).toLocaleString('es-AR', { minimumFractionDigits: 2 })]),
+        head: [['Fecha', 'Descripción', 'Categoría', 'Persona', `Monto (${prefMoneda})`]],
+        body: list.map(g => {
+          const mConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+          const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
+          return [
+            fdate(g.fecha), 
+            g.descripcion || '', 
+            g.categoria, 
+            g.persona, 
+            symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+          ];
+        }),
         startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [26, 26, 24] },
-        foot: [['', '', '', 'TOTAL', '$' + parseFloat(total).toLocaleString('es-AR', { minimumFractionDigits: 2 })]],
+        foot: [['', '', '', 'TOTAL', fmt(totalARS)]],
         footStyles: { fontStyle: 'bold' }
       });
       doc.save(`Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.pdf`);
@@ -1938,28 +2184,62 @@
     }
 
     // ─── CONFIG ──────────────────────────────────────────────────────────────────
+    async function addCategoria() {
+      const nombre = document.getElementById('new-cat').value.trim();
+      const presupuesto = parseFloat(document.getElementById('new-cat-ppto').value || 0);
+      const color = document.getElementById('new-cat-color').value;
+      if (!nombre) { showToast('Escribí el nombre', 'err'); return; }
+      if (categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) { showToast('Ya existe esa categoría', 'err'); return; }
+      const { data, error } = await sb.from('categorias').insert([{ nombre, color, presupuesto }]).select();
+      if (error) { showToast('Error al guardar: ' + error.message, 'err'); return; }
+      if (data) categorias.push(data[0]);
+      document.getElementById('new-cat').value = '';
+      document.getElementById('new-cat-ppto').value = '';
+      renderConfig(); initForm();
+      showToast('Categoría agregada ✓');
+    }
+
     function renderConfig() {
       document.getElementById('cfg-cats').innerHTML = categorias.map((c, i) =>
         `<div class="cat-cfg-item">
       <span style="width:16px;height:16px;border-radius:50%;background:${c.color};display:inline-block;flex-shrink:0"></span>
-      <span style="flex:1;font-size:14px">${c.nombre}</span>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600">${c.nombre}</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3)">
+          <span>Presupuesto: $</span>
+          <input type="number" value="${c.presupuesto || 0}" 
+            onchange="updateCategoriaPpto('${c.id}', this.value)" 
+            style="width:80px;padding:2px 4px;font-size:11px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text);font-family:inherit">
+        </div>
+      </div>
       <button class="btn btn-danger btn-sm" onclick="deleteCategoria('${c.id}')">🗑</button>
     </div>`
       ).join('');
+
+      const tarjetas = ['Visa', 'Mastercard', 'Amex'];
+      document.getElementById('cfg-tarjetas').innerHTML = tarjetas.map(t => {
+        const cfg = tarjetasCfg.find(c => c.tarjeta === t) || { dia_cierre: 15 };
+        return `<div class="cat-cfg-item">
+          <span class="tarjeta-badge" style="background:${TARJETA_COLORS[t]};color:white;width:80px;justify-content:center">${t}</span>
+          <div style="flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end">
+            <span style="font-size:12px">Cierra día:</span>
+            <input type="number" value="${cfg.dia_cierre}" min="1" max="31" 
+              onchange="saveTarjetaConfig('${t}', this.value)" 
+              style="width:50px;padding:4px;font-size:12px;text-align:center">
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    async function addCategoria() {
-      const nombre = document.getElementById('new-cat').value.trim();
-      const color = document.getElementById('new-cat-color').value;
-      if (!nombre) { showToast('Escribí el nombre', 'err'); return; }
-      if (categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) { showToast('Ya existe esa categoría', 'err'); return; }
-      const { data, error } = await saveCategoriaDB({ nombre, color });
-      if (error) { showToast('Error al guardar: ' + error.message, 'err'); return; }
-      if (data) categorias.push(data[0]);
-      else categorias.push({ id: Date.now().toString(), nombre, color });
-      document.getElementById('new-cat').value = '';
-      renderConfig(); initForm();
-      showToast('Categoría agregada ✓');
+    async function updatePrefMoneda(val) {
+      prefMoneda = val;
+      localStorage.setItem('prefMoneda', val);
+      initForm(); // Actualizar moneda por defecto en gastos
+      renderDash();
+      renderDeudas();
+      renderRecurrentes();
+      renderConfig();
+      showToast(`Moneda cambiada a ${val} ✓`);
     }
 
     async function deleteCategoria(id) {
@@ -1968,6 +2248,18 @@
       if (error) { showToast('Error al eliminar', 'err'); return; }
       categorias = categorias.filter(c => c.id !== id);
       renderConfig(); initForm();
+    }
+
+    async function updateCategoriaPpto(id, ppto) {
+      const valor = parseFloat(ppto || 0);
+      const { error } = await sb.from('categorias').update({ presupuesto: valor }).eq('id', id);
+      if (error) showToast('Error al actualizar presupuesto', 'err');
+      else {
+        const cat = categorias.find(c => c.id === id);
+        if (cat) cat.presupuesto = valor;
+        renderDash();
+        showToast('Presupuesto actualizado ✓');
+      }
     }
 
     // ─── DEUDAS ──────────────────────────────────────────────────────────────────
@@ -1984,6 +2276,9 @@
     function showFormDeuda() {
       const now = new Date();
       document.getElementById('d-inicio').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      
+      document.getElementById('d-moneda').value = prefMoneda;
+
       // Ordenar: primero el usuario logueado, luego los demás
       const yo = usuarios.find(u => u.id === currentUser.id);
       const resto = usuarios.filter(u => u.id !== currentUser.id);
@@ -2084,8 +2379,45 @@
     }
 
     function fmtDeuda(n, moneda) {
-      const s = parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
-      return moneda === 'USD' ? 'U$D '+s : '$'+s;
+      let finalVal = n;
+      if (moneda === 'USD' && prefMoneda === 'ARS') finalVal = n * dolarHoy;
+      if (moneda === 'ARS' && prefMoneda === 'USD') finalVal = n / dolarHoy;
+      
+      const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
+      const res = symbol + parseFloat(finalVal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      
+      if (moneda !== prefMoneda) {
+        const origSymbol = moneda === 'USD' ? 'U$D ' : '$';
+        const orig = origSymbol + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return `${res} <br><span style="font-size:10px;font-weight:400;color:var(--text3)">Original: ${orig}</span>`;
+      }
+      return res;
+    }
+
+    function getProxVencimiento(tarjeta) {
+      const cfg = tarjetasCfg.find(t => t.tarjeta === tarjeta);
+      if (!cfg) return { label: 'Sin config', color: 'var(--text3)' };
+      
+      const hoy = new Date();
+      const dia = hoy.getDate();
+      const mes = hoy.getMonth();
+      const anio = hoy.getFullYear();
+      
+      // Si hoy es antes o el mismo día del cierre, el resumen cierra este mes
+      // Si es después, ya estamos consumiendo para el próximo mes
+      let fechaCierre;
+      if (dia <= cfg.dia_cierre) {
+        fechaCierre = new Date(anio, mes, cfg.dia_cierre);
+      } else {
+        fechaCierre = new Date(anio, mes + 1, cfg.dia_cierre);
+      }
+      
+      const diffMs = fechaCierre - hoy;
+      const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return { label: 'CIERRA HOY', color: 'var(--red)' };
+      if (diffDays <= 3) return { label: `Cierra en ${diffDays}d`, color: 'var(--red)' };
+      return { label: `Cierra en ${diffDays}d`, color: 'var(--green)' };
     }
 
     function renderDeudas() {
@@ -2165,29 +2497,277 @@
         const color = TARJETA_COLORS[d.tarjeta] || '#888';
         const [y,m] = (d.mes_inicio||'').split('-');
         const inicioLabel = m && y ? `${MESES_SHORT[parseInt(m)-1]} ${y}` : '';
+        const venc = getProxVencimiento(d.tarjeta);
         return `<div class="deu-item" style="${terminada?'opacity:0.5':''}">
           <div class="deu-ico" style="background:${color}22">💳</div>
           <div class="deu-info">
             <div class="deu-desc">${d.descripcion||''}</div>
             <div class="deu-meta">
               <span class="tarjeta-badge" style="background:${color};color:white">${d.tarjeta}</span>
-              · ${d.persona} · ${inicioLabel}
+              · <span style="color:${venc.color};font-weight:700;font-size:10px">${venc.label}</span>
+              <br>${d.persona} · ${inicioLabel}
               ${d.notas ? `<br><span style="font-size:10px">${d.notas}</span>` : ''}
             </div>
             <div class="deu-progress"><div class="deu-progress-fill" style="width:${pct}%;background:${color}"></div></div>
             <div style="font-size:10px;color:var(--text2);margin-top:3px">${pagas}/${total} cuotas pagadas</div>
           </div>
           <div class="deu-right">
-            <div class="deu-monto">${fmtDeuda(d.monto_cuota, d.moneda)}/mes</div>
-            <div class="deu-cuota" style="font-size:10px">Total: ${fmtDeuda(d.monto_total, d.moneda)}</div>
+            <div class="deu-monto">${fmtDeuda(d.monto_cuota, d.moneda)}</div>
+            <div class="deu-cuota" style="font-size:10px">Total: ${fmtDeuda(d.monto_total, d.moneda).split('<br>')[0]}</div>
             ${!terminada ? `<button class="btn btn-sm" onclick="pagarCuota('${d.id}')" style="margin-top:6px;padding:4px 8px;font-size:11px">✓ Pagar cuota</button>` : '<div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">✓ Pagado</div>'}
             <button class="btn btn-danger btn-sm" onclick="deleteDeuda('${d.id}')" style="margin-top:4px;padding:3px 7px;font-size:11px">🗑</button>
+          </div>
+        </div>`;
+
+      }).join('');
+    }
+
+    // ─── EVOLUCIÓN (CHART) ───────────────────────────────────────────────────────
+    let evoChart = null;
+    function renderEvolutionChart() {
+      const ctx = document.getElementById('evolutionChart');
+      if (!ctx) return;
+
+      const last12 = [];
+      const now = new Date();
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        const total = allGastos
+          .filter(g => g.fecha && g.fecha.startsWith(ym))
+          .reduce((s, g) => {
+            const m = parseFloat(g.monto || 0);
+            return s + (g.moneda === 'USD' ? m * dolarHoy : m);
+          }, 0);
+        const yearShort = d.getFullYear().toString().slice(-2);
+        last12.push({ label: `${MESES_SHORT[d.getMonth()]} ${yearShort}`, value: total });
+      }
+
+
+      if (evoChart) evoChart.destroy();
+      
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      const textColor = isDark ? '#9b9896' : '#6b6966';
+
+      evoChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: last12.map(m => m.label),
+          datasets: [{
+            label: 'Gastos',
+            data: last12.map(m => (prefMoneda === 'USD' ? m.value / dolarHoy : m.value)),
+            borderColor: '#1D9E75',
+            backgroundColor: 'rgba(29, 158, 117, 0.1)',
+            fill: true,
+            tension: 0.4,
+            borderWidth: 3,
+            pointRadius: 0,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: false }, 
+            tooltip: { 
+              mode: 'index', 
+              intersect: false,
+              callbacks: {
+                label: function(ctx) {
+                  return 'Total: ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR');
+                }
+              }
+            } 
+          },
+          scales: {
+            y: { 
+              display: true, 
+              beginAtZero: true,
+              grid: { color: gridColor },
+              ticks: { 
+                color: textColor, 
+                font: { size: 9 },
+                callback: function(val) {
+                  if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
+                  if (val >= 1000) return (val/1000).toFixed(0) + 'k';
+                  return val;
+                }
+              }
+            },
+            x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    // ─── RECURRENTES ─────────────────────────────────────────────────────────────
+    async function loadRecurrentes() {
+      const { data, error } = await sb.from('recurrentes').select('*').order('descripcion');
+      if (data) allRecurrentes = data;
+    }
+
+    function renderRecurrentes() {
+      const el = document.getElementById('rec-lista');
+      if (allRecurrentes.length === 0) {
+        el.innerHTML = '<div class="rec-empty">No tenés gastos fijos configurados todavía.</div>';
+        return;
+      }
+
+      // Detectar qué recurrentes ya fueron cargados este mes
+      const ym = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}`;
+      const gastosMes = allGastos.filter(g => g.fecha && g.fecha.startsWith(ym));
+
+      el.innerHTML = allRecurrentes.map(r => {
+        const yaCargado = gastosMes.some(g => g.descripcion === r.descripcion && g.categoria === r.categoria);
+        return `
+        <div class="rec-item">
+          <div class="tx-dot" style="background:${catColor(r.categoria)}22">${catEmoji(r.categoria)}</div>
+          <div class="rec-info">
+            <div class="rec-name">${r.descripcion}</div>
+            <div class="rec-meta">${r.categoria} · ${personaBadge(r.persona)} · <strong>${r.moneda === 'USD' ? 'U$D ' : '$'}${parseFloat(r.monto).toLocaleString('es-AR')}</strong></div>
+          </div>
+          <div class="rec-actions">
+            ${yaCargado 
+              ? '<span style="color:var(--green);font-size:12px;font-weight:700;margin-right:8px">Cargado ✓</span>'
+              : `<button class="btn btn-primary btn-sm" onclick="cargarGastoRecurrente('${r.id}')">Cargar</button>`
+            }
+            <button class="btn btn-danger btn-sm" onclick="deleteRecurrente('${r.id}')">🗑</button>
           </div>
         </div>`;
       }).join('');
     }
 
+    function showFormRec() {
+      document.getElementById('rf-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+      document.getElementById('rf-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+      document.getElementById('rf-moneda').value = prefMoneda;
+      
+      // Federico por defecto
+      const personaSelect = document.getElementById('rf-persona');
+      const currentProfile = usuarios.find(u => u.id === currentUser.id);
+      if (currentProfile) personaSelect.value = currentProfile.name;
+
+      document.getElementById('rec-form').style.display = 'block';
+      document.getElementById('rec-form').scrollIntoView({ behavior: 'smooth' });
+    }
+
+
+    function hideFormRec() {
+      document.getElementById('rec-form').style.display = 'none';
+      ['rf-desc', 'rf-monto'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    async function saveRecurrente() {
+      const desc = document.getElementById('rf-desc').value.trim();
+      const monto = parseFloat(document.getElementById('rf-monto').value);
+      const cat = document.getElementById('rf-cat').value;
+      const persona = document.getElementById('rf-persona').value;
+      const moneda = document.getElementById('rf-moneda').value;
+
+      if (!desc || isNaN(monto) || monto <= 0) { showToast('Completá los datos correctamente', 'err'); return; }
+
+      const btn = document.getElementById('rf-save-btn');
+      btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
+
+      const item = { descripcion: desc, monto, categoria: cat, persona, moneda, user_id: currentUser.id, user_email: currentUser.email };
+      
+      const { data, error } = await sb.from('recurrentes').insert([item]).select();
+
+      
+      btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
+
+      if (error) { showToast('Error: ' + error.message, 'err'); }
+      else {
+        allRecurrentes.push(data[0]);
+        hideFormRec();
+        renderRecurrentes();
+        showToast('Gasto fijo guardado ✓');
+      }
+    }
+
+    async function deleteRecurrente(id) {
+      if (!confirm('¿Eliminar este gasto fijo?')) return;
+      const { error } = await sb.from('recurrentes').delete().eq('id', id);
+      if (error) { showToast('Error al eliminar', 'err'); return; }
+      allRecurrentes = allRecurrentes.filter(r => r.id !== id);
+      renderRecurrentes();
+    }
+
+    async function cargarGastoRecurrente(id) {
+      const r = allRecurrentes.find(x => x.id === id);
+      if (!r) return;
+
+      const hoy = new Date();
+      // Usar el mes seleccionado en el dashboard para la carga
+      const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+      
+      const gasto = { 
+        fecha, 
+        monto: r.monto, 
+        categoria: r.categoria, 
+        persona: r.persona, 
+        descripcion: r.descripcion, 
+        moneda: r.moneda || 'ARS',
+        notas: 'Carga automática (Fijo)',
+        user_id: currentUser.id, 
+        user_email: currentUser.email 
+      };
+
+
+      showToast('Cargando...', 'info');
+      const { error } = await sb.from('gastos').insert([gasto]);
+
+      if (error) { showToast('Error: ' + error.message, 'err'); }
+      else {
+        await loadGastos();
+        renderRecurrentes();
+        showToast('Gasto cargado al mes actual ✓');
+      }
+    }
+
+    async function cargarTodosRecurrentes() {
+      const ym = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}`;
+      const gastosMes = allGastos.filter(g => g.fecha && g.fecha.startsWith(ym));
+      const pendientes = allRecurrentes.filter(r => !gastosMes.some(g => g.descripcion === r.descripcion && g.categoria === r.categoria));
+
+      if (pendientes.length === 0) { showToast('No hay gastos fijos pendientes este mes', 'info'); return; }
+
+      const btn = document.getElementById('btn-cargar-todo');
+      btn.innerHTML = '<span class="spinner"></span> Cargando...'; btn.classList.add('btn-loading');
+
+      const hoy = new Date();
+      const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+      const nuevos = pendientes.map(r => ({
+        fecha, 
+        monto: r.monto, 
+        categoria: r.categoria, 
+        persona: r.persona, 
+        descripcion: r.descripcion, 
+        moneda: r.moneda || 'ARS',
+        notas: 'Carga automática masiva',
+        user_id: currentUser.id, 
+        user_email: currentUser.email 
+      }));
+
+
+      const { error } = await sb.from('gastos').insert(nuevos);
+      
+      btn.innerHTML = 'Cargar todo'; btn.classList.remove('btn-loading');
+
+      if (error) { showToast('Error: ' + error.message, 'err'); }
+      else {
+        await loadGastos();
+        renderRecurrentes();
+        showToast(`Se cargaron ${nuevos.length} gastos fijos ✓`);
+      }
+    }
+
+
     // ─── START ───────────────────────────────────────────────────────────────────
+
     const now = new Date();
     document.getElementById('r-mes') && (document.getElementById('r-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
     init();
