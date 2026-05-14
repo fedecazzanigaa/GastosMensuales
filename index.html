@@ -793,6 +793,31 @@
         opacity: .4
       }
     }
+    /* ── DEUDAS ── */
+    .deu-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px; }
+    .deu-item { display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid var(--border); }
+    .deu-item:last-child { border-bottom:none; }
+    .deu-ico { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0; }
+    .deu-info { flex:1;min-width:0; }
+    .deu-desc { font-size:14px;font-weight:600; }
+    .deu-meta { font-size:11px;color:var(--text2);margin-top:2px; }
+    .deu-progress { height:4px;border-radius:2px;background:var(--surface2);margin-top:6px;overflow:hidden; }
+    .deu-progress-fill { height:100%;border-radius:2px;background:var(--blue);transition:width .4s; }
+    .deu-right { text-align:right;flex-shrink:0; }
+    .deu-monto { font-size:14px;font-weight:700; }
+    .deu-cuota { font-size:11px;color:var(--text2);margin-top:2px; }
+    .tarjeta-badge { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700; }
+    .t-visa { background:#1a1f71;color:white; }
+    .t-mastercard { background:#eb001b;color:white; }
+    .t-amex { background:#2e77bc;color:white; }
+    .bar-chart { display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px; }
+    .bar-col { flex:1;display:flex;flex-direction:column;align-items:center;gap:4px; }
+    .bar-col-bar { width:100%;border-radius:4px 4px 0 0;background:var(--blue);min-height:2px;transition:height .4s; }
+    .bar-col-lbl { font-size:9px;color:var(--text2);text-align:center; }
+    .bar-col-val { font-size:9px;font-weight:600;color:var(--text);text-align:center; }
+    .resumen-tarjeta { display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border); }
+    .resumen-tarjeta:last-child { border-bottom:none; }
+
     /* ── MULTISELECT ── */
     .ms-wrap { position: relative; }
     .ms-trigger {
@@ -913,6 +938,7 @@
         <div class="card-title">Por categoría</div>
         <div id="dash-cats"></div>
       </div>
+      <div class="card" id="dash-deudas" style="display:none"></div>
       <div class="card">
         <div class="card-title">Últimos gastos</div>
         <div id="dash-recent"></div>
@@ -980,8 +1006,9 @@
       </div>
     </div> <!-- AQUÍ cerramos 'fg' de Persona -->
 
-    <div style="display:flex; align-items:flex-end; flex:1">
-      <button class="btn btn-primary btn-sm" style="width:100%; height:42px;" onclick="loadHistorial()">
+    <div class="fg" style="margin:0">
+      <label style="visibility:hidden">.</label>
+      <button class="btn btn-primary" style="margin:0;padding:13px 14px;font-size:15px" onclick="loadHistorial()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Filtrar
       </button>
@@ -1036,6 +1063,58 @@
           </button>
         </div>
         <div id="rep-preview"></div>
+      </div>
+    </div>
+
+    <!-- DEUDAS -->
+    <div id="p-deu" class="panel">
+      <!-- Resumen por tarjeta -->
+      <div id="deu-resumen"></div>
+      <!-- Gráfico próximos meses -->
+      <div class="card" id="deu-grafico-card" style="display:none">
+        <div class="card-title">Cuotas próximos 12 meses</div>
+        <div id="deu-grafico"></div>
+      </div>
+      <!-- Lista deudas activas -->
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Compras en cuotas</span>
+          <button class="btn btn-primary btn-sm" onclick="showFormDeuda()" style="margin:0">+ Nueva</button>
+        </div>
+        <div id="deu-lista"></div>
+      </div>
+      <!-- Formulario nueva deuda (oculto) -->
+      <div class="card" id="deu-form" style="display:none">
+        <div class="card-title">Nueva compra en cuotas</div>
+        <div class="fg"><label>Descripción</label><input type="text" id="d-desc" placeholder="Ej: Smart TV Samsung"></div>
+        <div class="form-2">
+          <div class="fg"><label>Monto total</label><input type="number" id="d-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="d-moneda">
+              <option value="ARS">$ Pesos</option>
+              <option value="USD">U$D Dólares</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-2">
+          <div class="fg"><label>Cantidad de cuotas</label><input type="number" id="d-cuotas" placeholder="12" min="1" max="60" inputmode="numeric"></div>
+          <div class="fg"><label>Mes inicio</label><input type="month" id="d-inicio"></div>
+        </div>
+        <div class="form-2">
+          <div class="fg"><label>Tarjeta</label>
+            <select id="d-tarjeta">
+              <option value="Visa">Visa</option>
+              <option value="Mastercard">Mastercard</option>
+              <option value="Amex">Amex</option>
+            </select>
+          </div>
+          <div class="fg"><label>¿Quién compró?</label>
+            <select id="d-persona"></select>
+          </div>
+        </div>
+        <div class="fg"><label>Notas (opcional)</label><input type="text" id="d-notas" placeholder="Ej: Cuotas sin interés"></div>
+        <button class="btn btn-primary" id="d-save-btn" onclick="saveDeuda()">Guardar</button>
+        <button class="btn" onclick="hideFormDeuda()">Cancelar</button>
       </div>
     </div>
 
@@ -1121,11 +1200,17 @@
       </svg>
       <span>Reportes</span>
     </button>
+    <button class="nav-btn" id="nb-deu" onclick="switchTab('deu')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <line x1="2" y1="10" x2="22" y2="10"/>
+      </svg>
+      <span>Deudas</span>
+    </button>
     <button class="nav-btn" id="nb-cfg" onclick="switchTab('cfg')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <circle cx="12" cy="12" r="3" />
-        <path
-          d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
       </svg>
       <span>Config</span>
     </button>
@@ -1201,6 +1286,7 @@
       await loadCategorias();
       await loadUsuarios();
       await loadGastos();
+      await loadDeudas();
       // Realtime desactivado - usando polling
       startPolling();
       initForm();
@@ -1399,17 +1485,53 @@
     // ─── TABS ────────────────────────────────────────────────────────────────────
     function switchTab(t) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', ['home', 'nuevo', 'hist', 'rep', 'cfg'][i] === t));
+      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', ['home', 'nuevo', 'hist', 'rep', 'deu', 'cfg'][i] === t));
       document.getElementById('p-' + t).classList.add('active');
       document.getElementById('app-content').scrollTop = 0;
       if (t === 'home') renderDash();
       if (t === 'nuevo') initForm();
       if (t === 'hist') { initHist(); loadHistorial(); }
+      if (t === 'deu') renderDeudas();
       if (t === 'cfg') renderConfig();
     }
 
     // ─── DASHBOARD ───────────────────────────────────────────────────────────────
-    function changeMonth(d) { dashMonth.setMonth(dashMonth.getMonth() + d); renderDash(); }
+
+    function renderDashDeudas() {
+      const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
+      if (activas.length === 0) {
+        const el = document.getElementById('dash-deudas');
+        if (el) el.style.display = 'none';
+        return;
+      }
+      const el = document.getElementById('dash-deudas');
+      if (el) {
+        el.style.display = 'block';
+        const tarjetas = ['Visa','Mastercard','Amex'];
+        const porTarjeta = {};
+        tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0 }; });
+        activas.forEach(d => {
+          if (porTarjeta[d.tarjeta]) {
+            if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
+            else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+          }
+        });
+        el.innerHTML = '<div class="card-title">Cuotas este mes</div>' +
+          tarjetas.filter(t => porTarjeta[t].ars > 0 || porTarjeta[t].usd > 0).map(t => {
+            const color = TARJETA_COLORS[t];
+            let montos = [];
+            if (porTarjeta[t].ars > 0) montos.push('$'+porTarjeta[t].ars.toLocaleString('es-AR',{minimumFractionDigits:2}));
+            if (porTarjeta[t].usd > 0) montos.push('U$D '+porTarjeta[t].usd.toLocaleString('es-AR',{minimumFractionDigits:2}));
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+              <span class="tarjeta-badge" style="background:${color};color:white">${t}</span>
+              <span style="font-size:13px;font-weight:600">${montos.join(' + ')}/mes</span>
+            </div>`;
+          }).join('') +
+          `<button class="btn btn-sm" onclick="switchTab('deu')" style="margin-top:10px;width:100%">Ver detalle →</button>`;
+      }
+    }
+
+        function changeMonth(d) { dashMonth.setMonth(dashMonth.getMonth() + d); renderDash(); }
 
     function getMonthGastos() {
       const y = dashMonth.getFullYear(), m = String(dashMonth.getMonth() + 1).padStart(2, '0');
@@ -1418,6 +1540,7 @@
 
     function renderDash() {
       const mg = getMonthGastos();
+      renderDashDeudas();
       document.getElementById('dash-month').textContent = `${MESES[dashMonth.getMonth()]} ${dashMonth.getFullYear()}`;
       const total = mg.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
 
@@ -1845,6 +1968,223 @@
       if (error) { showToast('Error al eliminar', 'err'); return; }
       categorias = categorias.filter(c => c.id !== id);
       renderConfig(); initForm();
+    }
+
+    // ─── DEUDAS ──────────────────────────────────────────────────────────────────
+    let allDeudas = [];
+    const TARJETA_COLORS = { Visa:'#1a1f71', Mastercard:'#eb001b', Amex:'#2e77bc' };
+    const TARJETA_EMOJIS = { Visa:'💳', Mastercard:'💳', Amex:'💎' };
+    const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+    async function loadDeudas() {
+      const { data, error } = await sb.from('deudas').select('*').order('created_at', { ascending: false });
+      if (data) allDeudas = data;
+    }
+
+    function showFormDeuda() {
+      const now = new Date();
+      document.getElementById('d-inicio').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      // Ordenar: primero el usuario logueado, luego los demás
+      const yo = usuarios.find(u => u.id === currentUser.id);
+      const resto = usuarios.filter(u => u.id !== currentUser.id);
+      const ordenados = yo ? [yo, ...resto] : usuarios;
+      document.getElementById('d-persona').innerHTML = ordenados.map((u, i) =>
+        `<option value="${u.name}">${u.name}${i === 0 ? ' (yo)' : ''}</option>`
+      ).join('');
+      document.getElementById('deu-form').style.display = 'block';
+      document.getElementById('deu-form').scrollIntoView({ behavior:'smooth' });
+    }
+
+    function hideFormDeuda() {
+      document.getElementById('deu-form').style.display = 'none';
+      ['d-desc','d-monto','d-cuotas','d-notas'].forEach(id => document.getElementById(id).value = '');
+    }
+
+    async function saveDeuda() {
+      const desc = document.getElementById('d-desc').value.trim();
+      const montoRaw = document.getElementById('d-monto').value;
+      const monto = parseFloat(montoRaw);
+      const moneda = document.getElementById('d-moneda').value;
+      const cuotas = parseInt(document.getElementById('d-cuotas').value);
+      const inicio = document.getElementById('d-inicio').value;
+      const tarjeta = document.getElementById('d-tarjeta').value;
+      const persona = document.getElementById('d-persona').value;
+      const notas = document.getElementById('d-notas').value.trim();
+      if (!desc) { showToast('Ingresá una descripción', 'err'); return; }
+      if (!montoRaw || isNaN(monto) || monto <= 0) { showToast('Ingresá un monto válido', 'err'); return; }
+      if (!cuotas || cuotas < 1) { showToast('Ingresá la cantidad de cuotas', 'err'); return; }
+      if (!inicio) { showToast('Seleccioná el mes de inicio', 'err'); return; }
+      const btn = document.getElementById('d-save-btn');
+      btn.innerHTML = '<span class="spinner"></span> Guardando...'; btn.classList.add('btn-loading');
+      const deuda = { descripcion:desc, monto_total:monto, moneda, cuotas_total:cuotas,
+        cuotas_pagas:0, mes_inicio:inicio, tarjeta, persona, notas,
+        monto_cuota: Math.round(monto/cuotas*100)/100,
+        user_id: currentUser.id, user_email: currentUser.email };
+      const safetyTimer = setTimeout(() => {
+        btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
+        showToast('Tiempo de espera agotado. Intentá de nuevo.', 'err');
+      }, 15000);
+      try {
+        const { error } = await sb.from('deudas').insert([deuda]);
+        if (error) {
+          showToast('Error: ' + error.message, 'err');
+        } else {
+          allDeudas.unshift({...deuda, id: Date.now()});
+          hideFormDeuda();
+          renderDeudas();
+          showToast('Deuda guardada ✓');
+        }
+      } catch(e) {
+        showToast('Error inesperado: ' + e.message, 'err');
+      } finally {
+        clearTimeout(safetyTimer);
+        btn.innerHTML = 'Guardar';
+        btn.classList.remove('btn-loading');
+      }
+    }
+
+    async function deleteDeuda(id) {
+      if (!confirm('¿Eliminar esta deuda?')) return;
+      const { error } = await sb.from('deudas').delete().eq('id', id);
+      if (error) { showToast('Error al eliminar', 'err'); return; }
+      allDeudas = allDeudas.filter(d => d.id !== id);
+      renderDeudas();
+      showToast('Deuda eliminada');
+    }
+
+    async function pagarCuota(id) {
+      const d = allDeudas.find(x => x.id === id);
+      if (!d) return;
+      const nuevasPagas = (d.cuotas_pagas || 0) + 1;
+      const { error } = await sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', id);
+      if (error) { showToast('Error', 'err'); return; }
+      d.cuotas_pagas = nuevasPagas;
+      renderDeudas();
+      showToast('Cuota marcada como paga ✓');
+    }
+
+    function getCuotasMes(yearMonth) {
+      // yearMonth = 'YYYY-MM'
+      return allDeudas.reduce((total, d) => {
+        if (!d.mes_inicio) return total;
+        const [y, m] = d.mes_inicio.split('-').map(Number);
+        const inicio = new Date(y, m-1, 1);
+        const [ty, tm] = yearMonth.split('-').map(Number);
+        const target = new Date(ty, tm-1, 1);
+        const diffMs = target - inicio;
+        const diffMonths = Math.round(diffMs / (1000*60*60*24*30.44));
+        const cuotasPagas = d.cuotas_pagas || 0;
+        const cuotasTotal = d.cuotas_total || 1;
+        const cuotaNum = diffMonths; // cuota 0 = primer mes
+        if (cuotaNum >= cuotasPagas && cuotaNum < cuotasTotal) {
+          return total + parseFloat(d.monto_cuota || 0);
+        }
+        return total;
+      }, 0);
+    }
+
+    function fmtDeuda(n, moneda) {
+      const s = parseFloat(n||0).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+      return moneda === 'USD' ? 'U$D '+s : '$'+s;
+    }
+
+    function renderDeudas() {
+      const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
+      const terminadas = allDeudas.filter(d => (d.cuotas_pagas||0) >= (d.cuotas_total||1));
+
+      // ── Resumen por tarjeta ──
+      const tarjetas = ['Visa','Mastercard','Amex'];
+      const resDiv = document.getElementById('deu-resumen');
+      const porTarjeta = {};
+      tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0, count:0 }; });
+      activas.forEach(d => {
+        if (porTarjeta[d.tarjeta]) {
+          porTarjeta[d.tarjeta].count++;
+          if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
+          else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+        }
+      });
+      const tarjetasConDeuda = tarjetas.filter(t => porTarjeta[t].count > 0);
+      if (tarjetasConDeuda.length === 0) {
+        resDiv.innerHTML = '<div class="empty" style="padding:1rem 0"><div class="empty-icon">💳</div>Sin deudas activas</div>';
+      } else {
+        resDiv.innerHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">Cuota mensual por tarjeta</div>' +
+          tarjetasConDeuda.map(t => {
+            const info = porTarjeta[t];
+            const color = TARJETA_COLORS[t];
+            let montos = [];
+            if (info.ars > 0) montos.push('<strong>$'+info.ars.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
+            if (info.usd > 0) montos.push('<strong>U$D '+info.usd.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
+            return `<div class="resumen-tarjeta">
+              <span style="display:flex;align-items:center;gap:8px">
+                <span class="tarjeta-badge" style="background:${color};color:white">${t}</span>
+                <span style="font-size:12px;color:var(--text2)">${info.count} compra${info.count>1?'s':''}</span>
+              </span>
+              <span style="font-size:14px">${montos.join(' + ')}/mes</span>
+            </div>`;
+          }).join('') + '</div>';
+      }
+
+      // ── Gráfico próximos 12 meses ──
+      const grafCard = document.getElementById('deu-grafico-card');
+      if (activas.length > 0) {
+        grafCard.style.display = 'block';
+        const now = new Date();
+        const mesesData = [];
+        for (let i = 0; i < 12; i++) {
+          const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+          const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          const total = getCuotasMes(ym);
+          mesesData.push({ label: MESES_SHORT[d.getMonth()], ym, total });
+        }
+        const maxVal = Math.max(...mesesData.map(m => m.total), 1);
+        document.getElementById('deu-grafico').innerHTML =
+          '<div class="bar-chart">' +
+          mesesData.map(m => `
+            <div class="bar-col">
+              <div class="bar-col-val">${m.total > 0 ? '$'+Math.round(m.total/1000)+'k' : ''}</div>
+              <div class="bar-col-bar" style="height:${Math.max(m.total/maxVal*100,2)}px;background:${m.total>0?'var(--blue)':'var(--border)'}"></div>
+              <div class="bar-col-lbl">${m.label}</div>
+            </div>`).join('') +
+          '</div>';
+      } else {
+        grafCard.style.display = 'none';
+      }
+
+      // ── Lista de deudas ──
+      const lista = document.getElementById('deu-lista');
+      if (allDeudas.length === 0) {
+        lista.innerHTML = '<div class="empty"><div class="empty-icon">🎉</div>Sin compras en cuotas</div>';
+        return;
+      }
+      lista.innerHTML = [...activas, ...terminadas].map(d => {
+        const pagas = d.cuotas_pagas || 0;
+        const total = d.cuotas_total || 1;
+        const pct = Math.round(pagas/total*100);
+        const terminada = pagas >= total;
+        const color = TARJETA_COLORS[d.tarjeta] || '#888';
+        const [y,m] = (d.mes_inicio||'').split('-');
+        const inicioLabel = m && y ? `${MESES_SHORT[parseInt(m)-1]} ${y}` : '';
+        return `<div class="deu-item" style="${terminada?'opacity:0.5':''}">
+          <div class="deu-ico" style="background:${color}22">💳</div>
+          <div class="deu-info">
+            <div class="deu-desc">${d.descripcion||''}</div>
+            <div class="deu-meta">
+              <span class="tarjeta-badge" style="background:${color};color:white">${d.tarjeta}</span>
+              · ${d.persona} · ${inicioLabel}
+              ${d.notas ? `<br><span style="font-size:10px">${d.notas}</span>` : ''}
+            </div>
+            <div class="deu-progress"><div class="deu-progress-fill" style="width:${pct}%;background:${color}"></div></div>
+            <div style="font-size:10px;color:var(--text2);margin-top:3px">${pagas}/${total} cuotas pagadas</div>
+          </div>
+          <div class="deu-right">
+            <div class="deu-monto">${fmtDeuda(d.monto_cuota, d.moneda)}/mes</div>
+            <div class="deu-cuota" style="font-size:10px">Total: ${fmtDeuda(d.monto_total, d.moneda)}</div>
+            ${!terminada ? `<button class="btn btn-sm" onclick="pagarCuota('${d.id}')" style="margin-top:6px;padding:4px 8px;font-size:11px">✓ Pagar cuota</button>` : '<div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:600">✓ Pagado</div>'}
+            <button class="btn btn-danger btn-sm" onclick="deleteDeuda('${d.id}')" style="margin-top:4px;padding:3px 7px;font-size:11px">🗑</button>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     // ─── START ───────────────────────────────────────────────────────────────────
