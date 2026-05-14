@@ -23,6 +23,7 @@ Categoría de gasto, Persona que hizo el gasto y mes.
 
 # Reportes #
 Obtene reportes de forma sencilla y fácil por mes. Se puede obtener un archivo "Excel" y/o "PDF" en caso de ser necesario.
+
 <img width="493" height="916" alt="image" src="https://github.com/user-attachments/assets/988c713f-021c-4711-9af6-002baf79b242" />
 
 PDF
