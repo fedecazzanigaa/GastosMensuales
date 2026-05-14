@@ -284,10 +284,6 @@
       font-weight: 600;
     }
 
-    .nav {
-      display: none;
-    }
-
     /* CARDS */
     .card {
       background: var(--surface);
@@ -587,6 +583,9 @@
     .tx-right {
       text-align: right;
       flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
     }
 
     .tx-amount {
@@ -804,7 +803,7 @@
     .deu-meta { font-size:11px;color:var(--text2);margin-top:2px; }
     .deu-progress { height:4px;border-radius:2px;background:var(--surface2);margin-top:6px;overflow:hidden; }
     .deu-progress-fill { height:100%;border-radius:2px;background:var(--blue);transition:width .4s; }
-    .deu-right { text-align:right;flex-shrink:0; }
+    .deu-right { text-align:right;flex-shrink:0; display: flex; flex-direction: column; align-items: flex-end; }
     .deu-monto { font-size:14px;font-weight:700; }
     .deu-cuota { font-size:11px;color:var(--text2);margin-top:2px; }
     .tarjeta-badge { display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700; }
@@ -972,17 +971,16 @@
     <div id="p-nuevo" class="panel">
       <div class="card">
         <div class="form-2">
-        <div class="fg"><label>Fecha</label><input type="date" id="f-fecha"></div>
-        <div class="form-2">
-          <div class="fg"><label>Monto $</label><input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01"
-              inputmode="decimal"></div>
-          <div class="fg"><label>Moneda</label>
-            <select id="f-moneda">
-              <option value="ARS">$ Pesos</option>
-              <option value="USD">U$D Dólares</option>
-            </select>
+          <div class="fg"><label>Fecha</label><input type="date" id="f-fecha"></div>
+          <div class="fg"><label>Monto</label>
+            <div style="display:flex;gap:8px">
+              <input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal" style="flex:1">
+              <select id="f-moneda" style="width:90px">
+                <option value="ARS">ARS</option>
+                <option value="USD">USD</option>
+              </select>
+            </div>
           </div>
-        </div>
         </div>
         <div class="form-2">
           <div class="fg"><label>Categoría</label><select id="f-cat"></select></div>
@@ -1641,7 +1639,6 @@
       const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
       const res = symbol + parseFloat(finalVal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       
-      // Mostrar el original en un tooltip pequeño si es diferente a la moneda de consolidación
       if (moneda !== prefMoneda) {
         const origSymbol = moneda === 'USD' ? 'U$D ' : '$';
         const orig = origSymbol + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1649,12 +1646,14 @@
       }
       return res;
     }
+    const fmtDeuda = fmtGasto;
 
 
     // ─── TABS ────────────────────────────────────────────────────────────────────
     function switchTab(t) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', ['home', 'nuevo', 'hist', 'rep', 'deu', 'cfg'][i] === t));
+      const tabs = ['home', 'nuevo', 'hist', 'rep', 'deu', 'rec', 'cfg'];
+      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
       document.getElementById('p-' + t).classList.add('active');
       document.getElementById('app-content').scrollTop = 0;
       if (t === 'home') renderDash();
@@ -1745,7 +1744,7 @@
       </div>
       <div class="metric">
         <div class="metric-label">${parejaNombre}</div>
-        <div class="metric-value g">${fmt(pareja)}</div>
+        <div class="metric-value r">${fmt(pareja)}</div>
       </div>
       `;
       const catMap = {};
@@ -2327,6 +2326,7 @@
           allDeudas.unshift({...deuda, id: Date.now()});
           hideFormDeuda();
           renderDeudas();
+          renderDash();
           showToast('Deuda guardada ✓');
         }
       } catch(e) {
@@ -2378,21 +2378,7 @@
       }, 0);
     }
 
-    function fmtDeuda(n, moneda) {
-      let finalVal = n;
-      if (moneda === 'USD' && prefMoneda === 'ARS') finalVal = n * dolarHoy;
-      if (moneda === 'ARS' && prefMoneda === 'USD') finalVal = n / dolarHoy;
-      
-      const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
-      const res = symbol + parseFloat(finalVal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      
-      if (moneda !== prefMoneda) {
-        const origSymbol = moneda === 'USD' ? 'U$D ' : '$';
-        const orig = origSymbol + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        return `${res} <br><span style="font-size:10px;font-weight:400;color:var(--text3)">Original: ${orig}</span>`;
-      }
-      return res;
-    }
+
 
     function getProxVencimiento(tarjeta) {
       const cfg = tarjetasCfg.find(t => t.tarjeta === tarjeta);
