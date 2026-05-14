@@ -12,13 +12,15 @@ Obtene un resumen rápido con lo gastado;
 . Cuotas a pagar en el mes corriente.
 
 # Nuevo Gasto #
-Carga fácil un nuevo gasto por día, categoría, persona y monto
+Carga fácil un nuevo gasto por día, categoría, persona y monto.
+
 <img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/5188c6fa-c194-41dc-8ec0-9600ac69d465" />
 
 # Historial #
 Consulta los gastos realizados.
 Se puede consultar por; 
 Categoría de gasto, Persona que hizo el gasto y mes.
+
 <img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/bb708edb-e6d9-42c8-b05f-8b996e1a20b4" />
 
 # Reportes #
@@ -26,7 +28,8 @@ Obtene reportes de forma sencilla y fácil por mes. Se puede obtener un archivo 
 
 <img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/988c713f-021c-4711-9af6-002baf79b242" />
 
-PDF
+PDF.
+
 <img width="904" height="395" alt="image" src="https://github.com/user-attachments/assets/10269a1a-59c1-49eb-aecd-0208ac7d3e7d" />
 
 # Deudas #
@@ -36,4 +39,5 @@ Carga las compras que se hicieron con Tarjeta. Se pueden ingresar número de cuo
 
 # Config #
 Agregá categorías para tus gastos de forma sencilla.
+
 <img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/ed4039f2-b466-468e-a9ba-7f386b950385" />
