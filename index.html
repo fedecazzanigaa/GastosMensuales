@@ -947,41 +947,50 @@
       </div>
     </div>
 
-    <!-- HISTORIAL -->
-    <div id="p-hist" class="panel">
-      <div class="filter-2" style="margin-bottom:10px">
-        <div class="fg"><label>Mes</label><input type="month" id="h-mes"></div>
-        <div class="fg" style="margin:0">
-          <label>Categoría</label>
-          <div class="ms-wrap">
-            <div class="ms-trigger" onclick="toggleMs('ms-cat')">
-              <span id="ms-cat-label">Todas</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
-            </div>
-            <div class="ms-dropdown" id="ms-cat" style="display:none"></div>
-          </div>
-        </div>
-        
-      </div>
-      <div class="filter-2" style="margin-bottom:14px">
-        <div class="fg" style="margin:0">
-          <label>Persona</label>
-          <div class="ms-wrap">
-            <div class="ms-trigger" onclick="toggleMs('ms-per')">
-              <span id="ms-per-label">Todos</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
-            </div>
-            <div class="ms-dropdown" id="ms-per" style="display:none"></div>
-          </div>
-        <div style="display:flex;align-items:flex-end">
-          <button class="btn btn-primary btn-sm" style="width:100%;padding:12px" onclick="loadHistorial()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            Filtrar
-          </button>
-        </div>
-      </div>
-      <div id="hist-list"></div>
+<!-- HISTORIAL -->
+<div id="p-hist" class="panel">
+  <!-- Fila 1: Mes y Categoría -->
+  <div class="filter-2" style="margin-bottom:10px">
+    <div class="fg">
+      <label>Mes</label>
+      <input type="month" id="h-mes">
     </div>
+    <div class="fg" style="margin:0">
+      <label>Categoría</label>
+      <div class="ms-wrap">
+        <div class="ms-trigger" onclick="toggleMs('ms-cat')">
+          <span id="ms-cat-label">Todas</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+        </div>
+        <div class="ms-dropdown" id="ms-cat" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fila 2: Persona y Botón Filtrar -->
+  <div class="filter-2" style="margin-bottom:14px">
+    <div class="fg" style="margin:0">
+      <label>Persona</label>
+      <div class="ms-wrap">
+        <div class="ms-trigger" onclick="toggleMs('ms-per')">
+          <span id="ms-per-label">Todos</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+        </div>
+        <div class="ms-dropdown" id="ms-per" style="display:none"></div>
+      </div>
+    </div> <!-- AQUÍ cerramos 'fg' de Persona -->
+
+    <div style="display:flex; align-items:flex-end; flex:1">
+      <button class="btn btn-primary btn-sm" style="width:100%; height:40px;" onclick="loadHistorial()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        Filtrar
+      </button>
+    </div>
+  </div> <!-- AQUÍ cerramos 'filter-2' -->
+
+  <!-- Lista de historial debajo de todo -->
+  <div id="hist-list"></div>
+</div>
 
 
     <!-- REPORTE -->
