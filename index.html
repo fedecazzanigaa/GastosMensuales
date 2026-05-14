@@ -981,7 +981,7 @@
     </div> <!-- AQUÍ cerramos 'fg' de Persona -->
 
     <div style="display:flex; align-items:flex-end; flex:1">
-      <button class="btn btn-primary btn-sm" style="width:100%; height:40px;" onclick="loadHistorial()">
+      <button class="btn btn-primary btn-sm" style="width:100%; height:42px;" onclick="loadHistorial()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         Filtrar
       </button>
@@ -1576,10 +1576,14 @@
     let msPerSel = new Set();
     let msInitDone = false;
     
-    function toggleMs(id) {
+    function toggleMs(id, event) {
+      if (event) event.stopPropagation();
       const el = document.getElementById(id);
       const isOpen = el.style.display !== 'none';
+      
+      // Cerramos otros dropdowns antes de abrir el actual
       document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+      
       if (!isOpen) el.style.display = 'block';
     }
     
@@ -1609,7 +1613,8 @@
       else lbl.textContent = `${msCatSel.size} categorías`;
     }
     
-    function msCatToggle(val) {
+    function msCatToggle(val, event) {
+      if (event) event.stopPropagation(); // ESTO evita que se cierre al marcar
       if (val === '__all__') msCatSel.clear();
       else {
         if (msCatSel.has(val)) msCatSel.delete(val);
@@ -1638,7 +1643,8 @@
       else lbl.textContent = `${msPerSel.size} personas`;
     }
     
-    function msPerToggle(val) {
+    function msPerToggle(val, event) {
+      if (event) event.stopPropagation(); // ESTO evita que se cierre al marcar
       if (val === '__all__') msPerSel.clear();
       else {
         if (msPerSel.has(val)) msPerSel.delete(val);
@@ -1646,6 +1652,13 @@
       }
       buildMsPer();
     }
+    
+    // Escuchador global para cerrar solo cuando se toca realmente "afuera"
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.ms-wrap')) {
+        document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
+      }
+    });
     
     function initHist() {
       const now = new Date();
