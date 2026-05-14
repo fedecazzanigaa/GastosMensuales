@@ -1278,9 +1278,6 @@
         const { error } = await sb.from('gastos').insert([gasto]);
         if (error) { setSyncStatus('err'); return { data: null, error }; }
         setSyncStatus('ok');
-        // Recargar todos los gastos para mantener sincronizado
-        const { data } = await sb.from('gastos').select('*').order('fecha', { ascending: false });
-        if (data) allGastos = data;
         return { data: [gasto], error: null };
       } catch (e) {
         setSyncStatus('err');
@@ -1370,10 +1367,15 @@
     }
 
     function renderDash() {
+      const mg = getMonthGastos();
+      document.getElementById('dash-month').textContent = `${MESES[dashMonth.getMonth()]} ${dashMonth.getFullYear()}`;
       const total = mg.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
 
-      const currentProfile = usuarios.find(u => u.id === currentUser.id);
+      const currentProfile = usuarios.find(u => u.id === currentUser?.id);
       const miNombre = currentProfile?.name || '';
+      // Nombre de la pareja: primer usuario que NO sea yo
+      const parejaProfile = usuarios.find(u => u.id !== currentUser?.id);
+      const parejaNombre = parejaProfile?.name || 'Pareja';
 
       const yo = mg
         .filter(g => g.persona === miNombre)
@@ -1384,18 +1386,16 @@
         .reduce((s, g) => s + parseFloat(g.monto || 0), 0);
 
       document.getElementById('dash-metrics').innerHTML = `
-      <div class="metric">
+      <div class="metric" style="grid-column:1/-1">
         <div class="metric-label">Total del mes</div>
         <div class="metric-value">${fmt(total)}</div>
       </div>
-
       <div class="metric">
-        <div class="metric-label">Yo</div>
+        <div class="metric-label">${miNombre || 'Yo'}</div>
         <div class="metric-value r">${fmt(yo)}</div>
       </div>
-
       <div class="metric">
-        <div class="metric-label">Pareja</div>
+        <div class="metric-label">${parejaNombre}</div>
         <div class="metric-value g">${fmt(pareja)}</div>
       </div>
       `;
@@ -1461,28 +1461,48 @@
     }
 
     async function saveGasto() {
+      // Validar TODO antes de tocar Supabase o bloquear el botón
       const fecha = document.getElementById('f-fecha').value;
-      const monto = parseFloat(document.getElementById('f-monto').value);
+      const montoRaw = document.getElementById('f-monto').value;
+      const monto = parseFloat(montoRaw);
       const cat = document.getElementById('f-cat').value;
       const persona = document.getElementById('f-persona').value;
       const desc = document.getElementById('f-desc').value.trim();
       const notas = document.getElementById('f-notas').value.trim();
       if (!fecha) { showToast('Ingresá la fecha', 'err'); return; }
-      if (!monto || monto <= 0) { showToast('Ingresá un monto válido', 'err'); return; }
+      if (!montoRaw || montoRaw.trim() === '' || isNaN(monto) || monto <= 0) {
+        showToast('Ingresá un monto válido', 'err'); return;
+      }
       if (!desc) { showToast('Ingresá una descripción', 'err'); return; }
+
+      // Solo bloquear el botón DESPUÉS de validar
       const btn = document.getElementById('save-btn');
       btn.innerHTML = '<span class="spinner"></span> Guardando...';
       btn.classList.add('btn-loading');
-      // Timeout de seguridad: si en 10 segundos no respondió, libera el botón
+
+      // Safety timer: 15 segundos máximo
       const safetyTimer = setTimeout(() => {
         resetSaveBtn();
         showToast('Tiempo de espera agotado. Intentá de nuevo.', 'err');
-      }, 10000);
+      }, 15000);
+
       try {
-        const gasto = { fecha, monto, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
-        const { data, error } = await saveGastoToDB(gasto);
-        if (error) { showToast('Error al guardar: ' + error.message, 'err'); }
-        else {
+        // Optimistic UI: agregar localmente de inmediato
+        const id_temp = 'tmp_' + Date.now();
+        const gasto = { id: id_temp, fecha, monto, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+        allGastos.unshift(gasto);
+        renderDash();
+
+        // Persistir en Supabase (sin el id temporal)
+        const { id: _drop, ...gastoSB } = gasto;
+        const { error } = await saveGastoToDB(gastoSB);
+
+        if (error) {
+          // Revertir optimistic update si falló
+          allGastos = allGastos.filter(g => g.id !== id_temp);
+          renderDash();
+          showToast('Error al guardar: ' + error.message, 'err');
+        } else {
           showToast('Gasto guardado ✓');
           clearForm();
         }
@@ -1509,8 +1529,7 @@
         '<option value="">Todos</option>' +
         usuarios.map(u =>
           `<option value="${u.name}">${u.name}</option>`
-        ).join('') +
-        '<option value="Ambos">Ambos</option>';
+        ).join('');
     }
 
     function loadHistorial() {
@@ -1643,8 +1662,8 @@
       // Hoja Gastos - con nombre en lugar de email
       const data = [['Fecha', 'Descripción', 'Categoría', 'Quién pagó', 'Cargado por', 'Monto ($)', 'Notas']];
       allGastos.forEach(g => {
-        const nombre = g.user_email ? g.user_email.split('@')[0] : '';
-        data.push([fdate(g.fecha), g.descripcion || '', g.categoria, g.persona, nombre, parseFloat(g.monto), g.notas || '']);
+        const cargadoPor = usuarios.find(u => u.id === g.user_id)?.name || (g.user_email ? g.user_email.split('@')[0] : '');
+        data.push([fdate(g.fecha), g.descripcion || '', g.categoria, g.persona, cargadoPor, parseFloat(g.monto), g.notas || '']);
       });
       const ws = XLSX.utils.aoa_to_sheet(data);
       ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 25 }];
