@@ -928,9 +928,6 @@
         <div class="fg"><label>Persona</label>
           <select id="h-persona">
             <option value="">Todos</option>
-            <option value="Yo">Yo</option>
-            <option value="Pareja">Pareja</option>
-            <option value="Ambos">Ambos</option>
           </select>
         </div>
         <div style="display:flex;align-items:flex-end">
@@ -1338,7 +1335,17 @@
     const EMOJIS = { 'Supermercado': '🛒', 'Servicios': '💡', 'Transporte': '🚗', 'Salud': '💊', 'Educación': '📚', 'Entretenimiento': '🎬', 'Ropa': '👕', 'Otros': '📦' };
     function catEmoji(n) { return EMOJIS[n] || '📦'; }
     function personaBadge(p) {
-      const cls = p === 'Yo' ? 'b-yo' : p === 'Pareja' ? 'b-senora' : 'b-ambos';
+      const currentProfile = usuarios.find(u => u.id === currentUser.id);
+      const miNombre = currentProfile?.name || '';
+
+      let cls = 'b-ambos';
+
+      if (p === miNombre) {
+        cls = 'b-yo';
+      } else if (p !== 'Ambos') {
+        cls = 'b-senora';
+      }
+
       return `<span class="badge ${cls}">${p}</span>`;
     }
 
@@ -1363,18 +1370,35 @@
     }
 
     function renderDash() {
-      const mg = getMonthGastos();
-      document.getElementById('dash-month').textContent = `${MESES[dashMonth.getMonth()]} ${dashMonth.getFullYear()}`;
       const total = mg.reduce((s, g) => s + parseFloat(g.monto || 0), 0);
-      const yo = mg.filter(g => g.persona === 'Yo').reduce((s, g) => s + parseFloat(g.monto || 0), 0);
-      const ella = mg.filter(g => g.persona === 'Pareja').reduce((s, g) => s + parseFloat(g.monto || 0), 0);
-      const ambos = mg.filter(g => g.persona === 'Ambos').reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+
+      const currentProfile = usuarios.find(u => u.id === currentUser.id);
+      const miNombre = currentProfile?.name || '';
+
+      const yo = mg
+        .filter(g => g.persona === miNombre)
+        .reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+
+      const pareja = mg
+        .filter(g => g.persona !== miNombre && g.persona !== 'Ambos')
+        .reduce((s, g) => s + parseFloat(g.monto || 0), 0);
+
       document.getElementById('dash-metrics').innerHTML = `
-    <div class="metric"><div class="metric-label">Total del mes</div><div class="metric-value">${fmt(total)}</div></div>
-    <div class="metric"><div class="metric-label">Ambos</div><div class="metric-value">${fmt(ambos)}</div></div>
-    <div class="metric"><div class="metric-label">Yo</div><div class="metric-value r">${fmt(yo)}</div></div>
-    <div class="metric"><div class="metric-label">Pareja</div><div class="metric-value g">${fmt(ella)}</div></div>
-  `;
+      <div class="metric">
+        <div class="metric-label">Total del mes</div>
+        <div class="metric-value">${fmt(total)}</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Yo</div>
+        <div class="metric-value r">${fmt(yo)}</div>
+      </div>
+
+      <div class="metric">
+        <div class="metric-label">Pareja</div>
+        <div class="metric-value g">${fmt(pareja)}</div>
+      </div>
+      `;
       const catMap = {};
       mg.forEach(g => { catMap[g.categoria] = (catMap[g.categoria] || 0) + parseFloat(g.monto || 0); });
       const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
@@ -1414,11 +1438,19 @@
           `<option value="${c.nombre}">${c.nombre}</option>`
         ).join('');
 
-      document.getElementById('f-persona').innerHTML =
+      const personaSelect = document.getElementById('f-persona');
+
+      personaSelect.innerHTML =
         usuarios.map(u =>
           `<option value="${u.name}">${u.name}</option>`
         ).join('') +
         `<option value="Ambos">Ambos</option>`;
+
+      const currentProfile = usuarios.find(u => u.id === currentUser.id);
+
+      if (currentProfile) {
+        personaSelect.value = currentProfile.name;
+      }
     }
 
     const BTN_LABEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> Guardar gasto';
@@ -1473,6 +1505,12 @@
       const now = new Date();
       document.getElementById('h-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       document.getElementById('h-cat').innerHTML = '<option value="">Todas</option>' + categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+      document.getElementById('h-persona').innerHTML =
+        '<option value="">Todos</option>' +
+        usuarios.map(u =>
+          `<option value="${u.name}">${u.name}</option>`
+        ).join('') +
+        '<option value="Ambos">Ambos</option>';
     }
 
     function loadHistorial() {
