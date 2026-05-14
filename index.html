@@ -1725,7 +1725,7 @@
           <span style="font-weight:600">Todas</span>
         </div>` +
         items.map(item =>
-          `<div class="ms-item" onclick="msCatToggle('${item}')">
+          `<div class="ms-item" onclick="msCatToggle('${item}');event.stopPropagation()">
             <div class="ms-check ${msCatSel.has(item) ? 'on' : ''}"></div>
             <span>${item}</span>
           </div>`
@@ -1755,7 +1755,7 @@
           <span style="font-weight:600">Todos</span>
         </div>` +
         items.map(item =>
-          `<div class="ms-item" onclick="msPerToggle('${item}')">
+          `<div class="ms-item" onclick="msPerToggle('${item}');event.stopPropagation()">
             <div class="ms-check ${msPerSel.has(item) ? 'on' : ''}"></div>
             <span>${item}</span>
           </div>`
