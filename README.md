@@ -31,6 +31,7 @@ PDF
 
 # Deudas #
 Carga las compras que se hicieron con Tarjeta. Se pueden ingresar número de cuotas, monto total y la tarjeta con la cual se realizó la compra.
+
 <img width="492" height="915" alt="image" src="https://github.com/user-attachments/assets/8dc8fea8-573f-4583-829b-09d34ed793ab" />
 
 # Config #
