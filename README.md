@@ -5,7 +5,7 @@ De forma fácil, rápida e intuitiva; lleva los gastos mensuales por día/mes/pe
 # Resumen #
 Obtene un resumen rápido con lo gastado;
 
-<img width="495" height="914" alt="image" src="https://github.com/user-attachments/assets/7a5d8547-da49-46f2-8115-b11159f633c0" />
+<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/7a5d8547-da49-46f2-8115-b11159f633c0" />
 
 . Gráfico lineal con % de gastos por CATEGORIA.
 . Últimos gastos.
