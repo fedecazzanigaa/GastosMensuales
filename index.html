@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Gastos">
+  <meta name="theme-color" content="#111110">
+  <title>Gastos Familiares</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2454/2454282.png">
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Librerías Externas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <!-- TOAST -->
+  <div class="toast-wrap"><div id="toast" class="toast"></div></div>
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen">
+    <div class="auth-logo">💰</div>
+    <div class="auth-title">Gastos Familiares</div>
+    <div class="auth-sub">Control compartido en pareja</div>
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="showAuthTab('login')">Ingresar</button>
+        <button class="auth-tab" onclick="showAuthTab('register')">Registrarse</button>
+      </div>
+      <div id="auth-error" class="auth-error"></div>
+      <div id="auth-msg" class="auth-msg"></div>
+      <div id="login-form">
+        <div class="fg"><label>Email</label><input type="email" id="l-email" placeholder="tu@email.com"></div>
+        <div class="fg"><label>Contraseña</label><input type="password" id="l-pass" placeholder="••••••••"></div>
+        <button class="btn btn-primary" onclick="login()" id="login-btn">Ingresar</button>
+      </div>
+      <div id="register-form" style="display:none">
+        <div class="fg"><label>Nombre</label><input type="text" id="r-name" placeholder="Tu nombre"></div>
+        <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="tu@email.com"></div>
+        <div class="fg"><label>Contraseña</label><input type="password" id="r-pass" placeholder="Mínimo 6 caracteres"></div>
+        <button class="btn btn-primary" onclick="register()" id="register-btn">Crear cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <div class="header" id="app-header">
+    <div class="header-left">
+      <div class="header-title">💰 Gastos</div>
+      <div class="header-user" id="header-user"></div>
+    </div>
+    <div class="header-right">
+      <div class="sync-badge"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Conectado</span></div>
+      <button class="logout-btn" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="app-content">
+    <div id="p-home" class="panel active">
+      <div class="month-nav">
+        <button class="mnav-btn" onclick="changeMonth(-1)">❮</button>
+        <span class="mnav-title" id="dash-month"></span>
+        <button class="mnav-btn" onclick="changeMonth(1)">❯</button>
+      </div>
+      <div class="metrics" id="dash-metrics"></div>
+      <div class="card"><div class="card-title">Por categoría</div><div id="dash-cats"></div></div>
+      <div class="card"><div class="card-title">Últimos gastos</div><div id="dash-recent"></div></div>
+    </div>
+
+    <!-- Otros paneles se cargan igual que antes... -->
+    <!-- (Para esta demo incluimos los principales) -->
+    <div id="p-nuevo" class="panel">
+       <div class="card">
+         <div class="fg"><label>Monto</label><input type="number" id="f-monto" placeholder="0.00"></div>
+         <div class="fg"><label>Descripción</label><input type="text" id="f-desc" placeholder="Ej: Supermercado"></div>
+         <button class="btn btn-primary" onclick="saveGasto()">Guardar</button>
+       </div>
+    </div>
+    
+    <!-- Panel Configuración -->
+    <div id="p-cfg" class="panel">
+      <div class="section-lbl">Notificaciones</div>
+      <div class="card">
+        <button class="btn btn-primary" onclick="requestNotificationPermission()">Activar Notificaciones</button>
+        <p id="notif-status" style="font-size:11px; margin-top:8px"></p>
+      </div>
+      <div class="card">
+        <button class="btn btn-danger" onclick="logout()">Cerrar Sesión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAVIGATION -->
+  <nav class="nav" id="app-nav">
+    <button class="nav-btn active" id="nb-home" onclick="switchTab('home')"><span>Resumen</span></button>
+    <button class="nav-btn" id="nb-nuevo" onclick="switchTab('nuevo')"><span>Nuevo</span></button>
+    <button class="nav-btn" id="nb-cfg" onclick="switchTab('cfg')"><span>Config</span></button>
+  </nav>
+
+  <!-- SCRIPTS -->
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js');
+      });
+    }
+  </script>
+</body>
+</html>

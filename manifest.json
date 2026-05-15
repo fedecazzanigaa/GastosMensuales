@@ -1,0 +1,17 @@
+{
+  "name": "Gastos Familiares",
+  "short_name": "Gastos",
+  "description": "Control de gastos compartidos en pareja",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#111110",
+  "theme_color": "#111110",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2454/2454282.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
