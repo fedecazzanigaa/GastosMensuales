@@ -1,4 +1,5 @@
 // ─── CONFIG ─────────────────────────────────────────────────────────────────
+console.log("Gastos App v2.1 - Debugging active");
 // Reemplazá estos valores con los de tu proyecto Supabase
 const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://kgoupyevvazwfkrvekfu.supabase.co';
 const SUPABASE_KEY = window.ENV_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtnb3VweWV2dmF6d2ZrcnZla2Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDA4NjQsImV4cCI6MjA5NDI3Njg2NH0.kOPjymydE1ezGxMEIKhwhbIQmnxG5felXiURhaIyk6E';
@@ -285,6 +286,10 @@ async function logout() {
 function setSyncStatus(status) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-label');
+  if (!dot || !lbl) {
+    console.warn('Sync status elements not found');
+    return;
+  }
   if (status === 'ok') { dot.className = 'sync-dot'; lbl.textContent = 'Sincronizado'; }
   else if (status === 'sync') { dot.className = 'sync-dot warn'; lbl.textContent = 'Guardando...'; }
   else { dot.className = 'sync-dot warn'; lbl.textContent = 'Sin conexión'; }
