@@ -15,15 +15,38 @@ const SUPABASE_KEY = window.ENV_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 let sb, currentUser;
 
 /**
- * Helper para ejecutar promesas con un tiempo de espera máximo.
- * Evita que la app quede "clavada" si Supabase no responde.
+ * Helper para ejecutar promesas con reintentos y tiempo de espera.
+ * Ideal para redes móviles inestables.
  */
-async function sbWithTimeout(promise, timeoutMs = 15000) {
-  const timeout = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Tiempo de espera agotado (15s)')), timeoutMs)
-  );
-  return Promise.race([promise, timeout]);
+async function sbWithTimeout(promiseFn, timeoutMs = 12000, retries = 1) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const promise = typeof promiseFn === 'function' ? promiseFn() : promiseFn;
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Tiempo de espera agotado')), timeoutMs)
+      );
+      return await Promise.race([promise, timeout]);
+    } catch (err) {
+      if (i === retries) throw err;
+      console.warn("Reintentando petición...");
+      await new Promise(r => setTimeout(r, 1000));
+    }
+  }
 }
+
+// Verificar sesión al volver a la app
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sb) {
+    sb.auth.getSession().then(({ data }) => {
+      if (!data.session) {
+        console.warn("Sesión perdida al volver");
+        setSyncStatus('err');
+      } else {
+        setSyncStatus('ok');
+      }
+    });
+  }
+});
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 let allGastos = [];
@@ -47,44 +70,54 @@ let categorias = [
   { id: 'cat-8', nombre: 'Deudas', color: '#185FA5' },
   { id: 'cat-9', nombre: 'Otros', color: '#639922' }
 ];
+
+/**
+ * Normaliza la entrada de números para soportar coma decimal
+ * y evitar errores de overflow.
+ */
+function parseInputFloat(val) {
+  if (!val) return 0;
+  const clean = val.toString().replace(',', '.');
+  const num = parseFloat(clean);
+  if (isNaN(num)) return 0;
+  // Límite de seguridad para evitar overflow en DB (ej: 1 billón)
+  if (num > 999999999999) return 999999999999;
+  return num;
+}
+
 let dashMonth = new Date(); dashMonth.setDate(1);
+let isAppLoaded = false; // Evita doble inicialización
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 async function init() {
   console.log("Iniciando aplicación...");
   try {
     if (typeof supabase === 'undefined') {
-      alert("Error: No se pudo cargar la librería de Supabase. Verificá tu conexión.");
+      alert("Error: No se pudo cargar la librería de Supabase.");
       return;
     }
 
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // Timeout de seguridad para la sesión inicial
-    const sessionPromise = sb.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout obteniendo sesión")), 10000));
+    const { data } = await sb.auth.getSession();
+    const session = data?.session;
     
-    let session = null;
-    try {
-      const { data } = await Promise.race([sessionPromise, timeoutPromise]);
-      session = data?.session;
-    } catch (err) {
-      console.warn("No se pudo obtener sesión inicial:", err.message);
-    }
-    
-    if (session) {
+    if (session && !isAppLoaded) {
       currentUser = session.user;
+      isAppLoaded = true;
       await showApp();
-    } else {
+    } else if (!session) {
       showAuth();
     }
 
     sb.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth event:', event);
-      if (event === 'SIGNED_IN' && session) {
+      if (event === 'SIGNED_IN' && session && !isAppLoaded) {
         currentUser = session.user;
+        isAppLoaded = true;
         await showApp();
       } else if (event === 'SIGNED_OUT') {
+        isAppLoaded = false;
         showAuth();
       }
     });
@@ -240,14 +273,14 @@ async function login() {
   const pass = document.getElementById('l-pass').value;
   if (!email || !pass) { showAuthError('Completá todos los campos'); return; }
   const btn = document.getElementById('login-btn');
-  btn.innerHTML = '<span class="spinner"></span> Ingresando...'; btn.classList.add('btn-loading');
+  if (btn) { btn.innerHTML = '<span class="spinner"></span> Ingresando...'; btn.classList.add('btn-loading'); }
   try {
-    const { error } = await sbWithTimeout(sb.auth.signInWithPassword({ email, password: pass }));
+    const { error } = await sbWithTimeout(() => sb.auth.signInWithPassword({ email, password: pass }));
     if (error) throw error;
   } catch (error) {
     showAuthError(error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message);
   } finally {
-    btn.innerHTML = 'Ingresar'; btn.classList.remove('btn-loading');
+    if (btn) { btn.innerHTML = 'Ingresar'; btn.classList.remove('btn-loading'); }
   }
 }
 
@@ -261,7 +294,7 @@ async function register() {
   btn.innerHTML = '<span class="spinner"></span> Creando cuenta...'; btn.classList.add('btn-loading');
   
   try {
-    const { data, error } = await sbWithTimeout(sb.auth.signUp({
+    const { data, error } = await sbWithTimeout(() => sb.auth.signUp({
       email,
       password: pass,
       options: { data: { name } }
@@ -270,7 +303,7 @@ async function register() {
     if (error) throw error;
 
     if (data?.user) {
-      await sbWithTimeout(sb.from('profiles').insert([{
+      await sbWithTimeout(() => sb.from('profiles').insert([{
         id: data.user.id,
         name: name,
         email: email
@@ -350,7 +383,7 @@ async function loadTarjetasConfig() {
 
 async function saveTarjetaConfig(tarjeta, dia_cierre) {
   try {
-    const { error } = await sbWithTimeout(sb.from('tarjetas_config').upsert({ 
+    const { error } = await sbWithTimeout(() => sb.from('tarjetas_config').upsert({ 
       tarjeta, 
       dia_cierre: parseInt(dia_cierre),
       user_id: currentUser.id 
@@ -377,7 +410,12 @@ async function loadUsuarios() {
 }
 
 async function loadGastos() {
-  const { data, error } = await sb.from('gastos').select('*').order('fecha', { ascending: false });
+  const { data, error } = await sb
+    .from('gastos')
+    .select('*')
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false });
+
   if (data) { 
     allGastos = data; 
     renderDash(); 
@@ -388,7 +426,7 @@ async function loadGastos() {
 async function saveGastoToDB(gasto) {
   setSyncStatus('sync');
   try {
-    const { error } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    const { error } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
     if (error) { 
       setSyncStatus('err'); 
       return { data: null, error }; 
@@ -404,7 +442,7 @@ async function saveGastoToDB(gasto) {
 async function deleteGastoDB(id) {
   setSyncStatus('sync');
   try {
-    const { error } = await sbWithTimeout(sb.from('gastos').delete().eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('gastos').delete().eq('id', id));
     setSyncStatus(error ? 'err' : 'ok');
     return { error };
   } catch (e) {
@@ -430,7 +468,12 @@ function subscribeRealtime() {
   realtimeChannel = sb.channel('public:gastos')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, async (payload) => {
       // Recargar datos solo cuando sea necesario
-      const { data } = await sb.from('gastos').select('*').order('fecha', { ascending: false });
+      const { data } = await sb
+        .from('gastos')
+        .select('*')
+        .order('fecha', { ascending: false })
+        .order('created_at', { ascending: false });
+
       if (data) {
         allGastos = data;
         renderDash();
@@ -699,48 +742,52 @@ function resetSaveBtn() {
 }
 
 async function saveGasto() {
-  // Validar TODO antes de tocar Supabase o bloquear el botón
   const fecha = document.getElementById('f-fecha').value;
-  const montoRaw = document.getElementById('f-monto').value;
+  let montoRaw = document.getElementById('f-monto').value;
+  
+  // Limpieza para móviles: comas por puntos y quitar basura
+  montoRaw = montoRaw.replace(',', '.').replace(/[^0-9.]/g, '');
+  
   const monto = parseFloat(montoRaw);
   const moneda = document.getElementById('f-moneda').value;
   const cat = document.getElementById('f-cat').value;
   const persona = document.getElementById('f-persona').value;
   const desc = document.getElementById('f-desc').value.trim();
   const notas = document.getElementById('f-notas').value.trim();
+
   if (!fecha) { showToast('Ingresá la fecha', 'err'); return; }
-  if (!montoRaw || montoRaw.trim() === '' || isNaN(monto) || monto <= 0) {
+  if (!montoRaw || isNaN(monto) || monto <= 0) {
     showToast('Ingresá un monto válido', 'err'); return;
   }
   if (!desc) { showToast('Ingresá una descripción', 'err'); return; }
 
-  // Solo bloquear el botón DESPUÉS de validar
   const btn = document.getElementById('save-btn');
-  btn.innerHTML = '<span class="spinner"></span> Guardando...';
-  btn.classList.add('btn-loading');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
 
   try {
-    // Optimistic UI: agregar localmente de inmediato
+    // Redondeo estricto para evitar error de overflow en Supabase
+    const montoFinal = Number(monto.toFixed(2));
+    if (montoFinal > 99999999) { throw new Error('El monto es demasiado alto'); }
+
     const id_temp = 'tmp_' + Date.now();
-    const gasto = { id: id_temp, fecha, monto, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+    const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
     allGastos.unshift(gasto);
     renderDash();
 
-    // Persistir en Supabase (sin el id temporal)
     const { id: _drop, ...gastoSB } = gasto;
     const { error } = await saveGastoToDB(gastoSB);
 
     if (error) {
-      // Revertir optimistic update si falló
       allGastos = allGastos.filter(g => g.id !== id_temp);
       renderDash();
-      showToast('Error al guardar: ' + error.message, 'err');
+      showToast('Error: ' + error.message, 'err');
     } else {
       showToast('Gasto guardado ✓');
       clearForm();
+      document.getElementById('f-monto').focus();
     }
   } catch (e) {
-    showToast('Error inesperado: ' + e.message, 'err');
+    showToast(e.message || 'Error inesperado', 'err');
   } finally {
     resetSaveBtn();
   }
@@ -771,7 +818,7 @@ function toggleMs(id, event) {
   el.style.display = isOpen ? 'none' : 'block';
 }
 
-// Un solo listener global optimizado
+// Listener global optimizado para evitar cierres de teclado en móviles
 document.addEventListener('click', e => {
   if (!e.target.closest('.ms-wrap')) {
     const drops = document.querySelectorAll('.ms-dropdown');
@@ -779,9 +826,8 @@ document.addEventListener('click', e => {
     drops.forEach(d => { if(d.style.display !== 'none') anyOpen = true; });
     
     if (anyOpen) {
-      // Usamos requestAnimationFrame para no interferir con el foco inmediato de otros campos
-      requestAnimationFrame(() => {
-        drops.forEach(d => d.style.display = 'none');
+      drops.forEach(d => {
+        if (d.style.display !== 'none') d.style.display = 'none';
       });
     }
   }
@@ -865,11 +911,8 @@ function loadHistorial() {
   if (mes) f = f.filter(g => g.fecha && g.fecha.startsWith(mes));
   if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
   if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
-  f = f.slice().sort((a, b) => {
-    const dateComp = b.fecha.localeCompare(a.fecha);
-    if (dateComp !== 0) return dateComp;
-    return a.categoria.localeCompare(b.categoria);
-  });
+  // La lista ya viene ordenada de la DB por fecha y created_at
+  f = f.slice();
   
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
@@ -1091,13 +1134,13 @@ function exportarBackup() {
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 async function addCategoria() {
   const nombre = document.getElementById('new-cat').value.trim();
-  const presupuesto = parseFloat(document.getElementById('new-cat-ppto').value || 0);
+  const presupuesto = parseInputFloat(document.getElementById('new-cat-ppto').value);
   const color = document.getElementById('new-cat-color').value;
   if (!nombre) { showToast('Escribí el nombre', 'err'); return; }
   if (categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) { showToast('Ya existe esa categoría', 'err'); return; }
   
   try {
-    const { data, error } = await sbWithTimeout(sb.from('categorias').insert([{ nombre, color, presupuesto }]).select());
+    const { data, error } = await sbWithTimeout(() => sb.from('categorias').insert([{ nombre, color, presupuesto }]).select());
     if (error) throw error;
     if (data) categorias.push(data[0]);
     document.getElementById('new-cat').value = '';
@@ -1161,9 +1204,9 @@ async function deleteCategoria(id) {
 }
 
 async function updateCategoriaPpto(id, ppto) {
-  const valor = parseFloat(ppto || 0);
+  const valor = parseInputFloat(ppto);
   try {
-    const { error } = await sbWithTimeout(sb.from('categorias').update({ presupuesto: valor }).eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('categorias').update({ presupuesto: valor }).eq('id', id));
     if (error) throw error;
     const cat = categorias.find(c => c.id === id);
     if (cat) cat.presupuesto = valor;
@@ -1210,7 +1253,7 @@ function hideFormDeuda() {
 async function saveDeuda() {
   const desc = document.getElementById('d-desc').value.trim();
   const montoRaw = document.getElementById('d-monto').value;
-  const monto = parseFloat(montoRaw);
+  const monto = parseInputFloat(montoRaw);
   const moneda = document.getElementById('d-moneda').value;
   const cuotas = parseInt(document.getElementById('d-cuotas').value);
   const inicio = document.getElementById('d-inicio').value;
@@ -1229,7 +1272,7 @@ async function saveDeuda() {
     user_id: currentUser.id, user_email: currentUser.email };
   
   try {
-    const { error } = await sbWithTimeout(sb.from('deudas').insert([deuda]));
+    const { error } = await sbWithTimeout(() => sb.from('deudas').insert([deuda]));
     if (error) throw error;
     
     allDeudas.unshift({...deuda, id: Date.now()});
@@ -1248,7 +1291,7 @@ async function saveDeuda() {
 async function deleteDeuda(id) {
   if (!confirm('¿Eliminar esta deuda?')) return;
   try {
-    const { error } = await sbWithTimeout(sb.from('deudas').delete().eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('deudas').delete().eq('id', id));
     if (error) throw error;
     allDeudas = allDeudas.filter(d => d.id !== id);
     renderDeudas();
@@ -1289,7 +1332,7 @@ async function confirmarPagoCuota() {
   
   try {
     // 1. Actualizar la deuda
-    const { error: errorDeuda } = await sbWithTimeout(sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id));
+    const { error: errorDeuda } = await sbWithTimeout(() => sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id));
     if (errorDeuda) throw errorDeuda;
     
     // 2. Crear un gasto automático para que se vea en el dashboard
@@ -1305,7 +1348,7 @@ async function confirmarPagoCuota() {
       user_email: currentUser.email
     };
     
-    const { error: errorGasto } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    const { error: errorGasto } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
     
     if (errorGasto) {
       showToast('Cuota marcada, pero no se pudo crear el gasto', 'warn');
@@ -1854,7 +1897,7 @@ function hideFormRec() {
 
 async function saveRecurrente() {
   const desc = document.getElementById('rf-desc').value.trim();
-  const monto = parseFloat(document.getElementById('rf-monto').value);
+  const monto = parseInputFloat(document.getElementById('rf-monto').value);
   const cat = document.getElementById('rf-cat').value;
   const persona = document.getElementById('rf-persona').value;
   const moneda = document.getElementById('rf-moneda').value;
@@ -1867,7 +1910,7 @@ async function saveRecurrente() {
   const item = { descripcion: desc, monto, categoria: cat, persona, moneda, user_id: currentUser.id, user_email: currentUser.email };
   
   try {
-    const { data, error } = await sbWithTimeout(sb.from('recurrentes').insert([item]).select());
+    const { data, error } = await sbWithTimeout(() => sb.from('recurrentes').insert([item]).select());
     if (error) throw error;
     if (data && data[0]) allRecurrentes.push(data[0]);
     hideFormRec();
@@ -1883,7 +1926,7 @@ async function saveRecurrente() {
 async function deleteRecurrente(id) {
   if (!confirm('¿Eliminar este gasto fijo?')) return;
   try {
-    const { error } = await sbWithTimeout(sb.from('recurrentes').delete().eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('recurrentes').delete().eq('id', id));
     if (error) throw error;
     allRecurrentes = allRecurrentes.filter(r => r.id !== id);
     renderRecurrentes();
@@ -1914,7 +1957,7 @@ async function cargarGastoRecurrente(id) {
 
   showToast('Cargando...', 'info');
   try {
-    const { error } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    const { error } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
     if (error) throw error;
     await loadGastos();
     renderRecurrentes();
@@ -1944,7 +1987,7 @@ async function cargarTodosRecurrentes() {
   }));
 
   try {
-    const { error } = await sbWithTimeout(sb.from('gastos').insert(nuevos));
+    const { error } = await sbWithTimeout(() => sb.from('gastos').insert(nuevos));
     if (error) throw error;
     await loadGastos();
     renderRecurrentes();
@@ -1983,7 +2026,7 @@ async function saveIngreso() {
   const btn = document.getElementById('i-save-btn');
   btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
   try {
-    const { error } = await sbWithTimeout(sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]));
+    const { error } = await sbWithTimeout(() => sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]));
     if (error) throw error;
     showToast('Ingreso guardado ✓'); 
     hideFormIngreso(); 
@@ -2036,7 +2079,7 @@ function renderBalance() {
 async function deleteIngreso(id) {
   if (!confirm('¿Eliminar ingreso?')) return;
   try {
-    const { error } = await sbWithTimeout(sb.from('ingresos').delete().eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('ingresos').delete().eq('id', id));
     if (error) throw error;
     await loadIngresos();
     renderBalance();
@@ -2070,7 +2113,7 @@ async function saveMeta() {
   if (btn) { btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading'); }
   
   try {
-    const { error } = await sbWithTimeout(sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]));
+    const { error } = await sbWithTimeout(() => sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]));
     if (error) throw error;
     showToast('Meta creada ✓'); 
     hideFormMeta(); 
@@ -2113,7 +2156,7 @@ async function updateMetaMonto(id) {
   const val = parseFloat(nuevo);
   if (isNaN(val)) return;
   try {
-    const { error } = await sbWithTimeout(sb.from('metas').update({ monto_actual: val }).eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('metas').update({ monto_actual: val }).eq('id', id));
     if (error) throw error;
     await loadGoals();
     renderGoals();
@@ -2125,7 +2168,7 @@ async function updateMetaMonto(id) {
 async function deleteMeta(id) {
   if (!confirm('¿Eliminar meta?')) return;
   try {
-    const { error } = await sbWithTimeout(sb.from('metas').delete().eq('id', id));
+    const { error } = await sbWithTimeout(() => sb.from('metas').delete().eq('id', id));
     if (error) throw error;
     await loadGoals();
     renderGoals();
