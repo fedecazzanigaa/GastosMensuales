@@ -45,6 +45,11 @@
         --accent: #f0ede8;
         --text-on-accent: #111110;
       }
+      .btn-primary {
+        background: transparent !important;
+        color: var(--accent) !important;
+        border: 1.5px solid var(--accent) !important;
+      }
     }
 
     :root {
@@ -1215,6 +1220,18 @@
 
     <!-- CONFIG -->
     <div id="p-cfg" class="panel">
+      <div class="section-lbl">Sistema de Notificaciones</div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1">
+            <span style="font-size:14px;display:block;font-weight:600">Avisos de Gastos</span>
+            <span style="font-size:11px;color:var(--text3)">Recibe alertas cuando tu pareja cargue un gasto.</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="requestNotificationPermission()" style="margin:0;width:auto;padding:8px 12px">Activar</button>
+        </div>
+        <p id="notif-status" style="font-size:10px;margin-top:8px;color:var(--text3)"></p>
+      </div>
+
       <div class="section-lbl">Preferencias Visuales</div>
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1556,11 +1573,44 @@
       document.getElementById('pref-moneda').value = prefMoneda;
       fetchDolar();
       
-      // Activar Realtime en lugar de Polling
+      // Activar Realtime
       subscribeRealtime();
       
       initForm();
       renderDash();
+      updateNotifStatus();
+    }
+
+    function requestNotificationPermission() {
+      if (!("Notification" in window)) {
+        alert("Este navegador no soporta notificaciones de escritorio.");
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        updateNotifStatus();
+        if (permission === "granted") {
+          showToast("¡Notificaciones activadas! ✓");
+          new Notification("Gastos Familiares", { body: "Las notificaciones están configuradas correctamente." });
+        } else {
+          showToast("Permiso de notificación denegado", "err");
+        }
+      });
+    }
+
+    function updateNotifStatus() {
+      const el = document.getElementById('notif-status');
+      if (!el) return;
+      if (!("Notification" in window)) {
+        el.textContent = "Navegador no compatible.";
+      } else if (Notification.permission === "granted") {
+        el.textContent = "✓ Notificaciones activadas.";
+        el.style.color = "var(--green)";
+      } else if (Notification.permission === "denied") {
+        el.textContent = "✕ Notificaciones bloqueadas en este navegador.";
+        el.style.color = "var(--red)";
+      } else {
+        el.textContent = "Estado: Pendiente de activar.";
+      }
     }
 
     // ─── AUTH ────────────────────────────────────────────────────────────────────
