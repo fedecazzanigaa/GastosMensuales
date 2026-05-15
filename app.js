@@ -143,18 +143,37 @@ async function showApp() {
 
 function requestNotificationPermission() {
   if (!("Notification" in window)) {
-    alert("Este navegador no soporta notificaciones de escritorio.");
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (isIOS) {
+      alert("Para recibir notificaciones en iPhone/iPad:\n1. Toca el botón 'Compartir' abajo (cuadrado con flecha).\n2. Elegí 'Añadir a la pantalla de inicio'.\n3. Abrí la aplicación desde tu pantalla de inicio e intentalo de nuevo.");
+    } else {
+      alert("Este navegador no soporta notificaciones de escritorio.");
+    }
     return;
   }
-  Notification.requestPermission().then(permission => {
+
+  const handlePermission = (permission) => {
     updateNotifStatus();
     if (permission === "granted") {
       showToast("¡Notificaciones activadas! ✓");
-      new Notification("Gastos Familiares", { body: "Las notificaciones están configuradas correctamente." });
-    } else {
-      showToast("Permiso de notificación denegado", "err");
+      new Notification("Gastos Familiares", { 
+        body: "Las notificaciones están configuradas correctamente.",
+        icon: 'https://cdn-icons-png.flaticon.com/512/2454/2454282.png'
+      });
+    } else if (permission === "denied") {
+      showToast("Permiso de notificación denegado. Habilitalo en los ajustes del sitio.", "err");
     }
-  });
+  };
+
+  // Safari antiguo usa callback, navegadores modernos usan Promise. Soportamos ambos.
+  try {
+    const promise = Notification.requestPermission(handlePermission);
+    if (promise && promise.then) {
+      promise.then(handlePermission);
+    }
+  } catch (e) {
+    Notification.requestPermission(handlePermission);
+  }
 }
 
 function updateNotifStatus() {
@@ -824,7 +843,11 @@ function loadHistorial() {
   if (mes) f = f.filter(g => g.fecha && g.fecha.startsWith(mes));
   if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
   if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
-  f = f.slice().sort((a, b) => b.fecha.localeCompare(a.fecha));
+  f = f.slice().sort((a, b) => {
+    const dateComp = b.fecha.localeCompare(a.fecha);
+    if (dateComp !== 0) return dateComp;
+    return a.categoria.localeCompare(b.categoria);
+  });
   
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
@@ -873,11 +896,29 @@ function getReporteData() {
     const mes = document.getElementById('r-mes').value;
     if (!mes) { showToast('Seleccioná un mes', 'err'); return null; }
     const [y, m] = mes.split('-');
-    return { list: allGastos.filter(g => g.fecha && g.fecha.startsWith(mes)).sort((a, b) => a.fecha.localeCompare(b.fecha)), label: `${MESES[parseInt(m) - 1]} ${y}` };
+    return { 
+      list: allGastos
+        .filter(g => g.fecha && g.fecha.startsWith(mes))
+        .sort((a, b) => {
+          const dateComp = b.fecha.localeCompare(a.fecha);
+          if (dateComp !== 0) return dateComp;
+          return a.categoria.localeCompare(b.categoria);
+        }), 
+      label: `${MESES[parseInt(m) - 1]} ${y}` 
+    };
   } else {
     const desde = document.getElementById('r-desde').value, hasta = document.getElementById('r-hasta').value;
     if (!desde || !hasta) { showToast('Seleccioná fechas', 'err'); return null; }
-    return { list: allGastos.filter(g => g.fecha >= desde && g.fecha <= hasta).sort((a, b) => a.fecha.localeCompare(b.fecha)), label: `${fdate(desde)} al ${fdate(hasta)}` };
+    return { 
+      list: allGastos
+        .filter(g => g.fecha >= desde && g.fecha <= hasta)
+        .sort((a, b) => {
+          const dateComp = b.fecha.localeCompare(a.fecha);
+          if (dateComp !== 0) return dateComp;
+          return a.categoria.localeCompare(b.categoria);
+        }), 
+      label: `${fdate(desde)} al ${fdate(hasta)}` 
+    };
   }
 }
 
@@ -997,7 +1038,8 @@ function exportarPDF() {
     }),
     startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [26, 26, 24] },
     foot: [['', '', '', 'TOTAL', fmt(totalARS)]],
-    footStyles: { fontStyle: 'bold' }
+    footStyles: { fontStyle: 'bold' },
+    showFoot: 'lastPage'
   });
   doc.save(`Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.pdf`);
   showToast('PDF exportado ✓');
