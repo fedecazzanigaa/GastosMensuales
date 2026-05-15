@@ -42,7 +42,13 @@
         --text: #f0ede8;
         --text2: #9b9896;
         --text3: #6b6966;
+        --accent: #f0ede8;
+        --text-on-accent: #111110;
       }
+    }
+
+    :root {
+      --text-on-accent: #f5f5f0;
     }
 
     * {
@@ -253,10 +259,17 @@
       display: none;
       padding-bottom: var(--sb);
       z-index: 10;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .nav::-webkit-scrollbar {
+      display: none;
     }
 
     .nav-btn {
-      flex: 1;
+      flex: 0 0 75px;
       border: none;
       background: none;
       padding: 10px 4px 8px;
@@ -479,7 +492,7 @@
 
     .btn-primary {
       background: var(--accent);
-      color: var(--bg);
+      color: var(--text-on-accent);
       border-color: var(--accent);
     }
 
@@ -1249,19 +1262,101 @@
         </button>
       </div>
 
-      <div class="section-lbl">Datos</div>
+    </div>
+
+    <!-- BALANCE (INGRESOS) -->
+    <div id="p-bal" class="panel">
+      <div class="metrics" id="bal-summary">
+        <!-- Resumen Ingresos, Gastos, Neto -->
+      </div>
+      
       <div class="card">
-        <button class="btn btn-green" onclick="exportarBackup()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7,10 12,15 17,10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Descargar backup Excel
-        </button>
-        <p style="font-size:12px;color:var(--text2);margin-top:4px;line-height:1.5">
-          Todos los datos se guardan en Supabase. El backup es una copia local de seguridad.
-        </p>
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Ingresos del Mes</span>
+          <button class="btn btn-primary btn-sm" onclick="showFormIngreso()" style="margin:0">+ Nuevo</button>
+        </div>
+        <div id="bal-ingresos-list"></div>
+      </div>
+
+      <!-- Form Nuevo Ingreso (Oculto) -->
+      <div class="card" id="bal-form" style="display:none">
+        <div class="card-title">Nuevo Ingreso</div>
+        <div class="fg"><label>Descripción</label><input type="text" id="i-desc" placeholder="Ej: Sueldo, Venta..."></div>
+        <div class="form-2">
+          <div class="fg"><label>Monto</label><input type="number" id="i-monto" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="i-moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg"><label>Fecha</label><input type="date" id="i-fecha"></div>
+        <button class="btn btn-primary" id="i-save-btn" onclick="saveIngreso()">Guardar</button>
+        <button class="btn" onclick="hideFormIngreso()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- METAS DE AHORRO -->
+    <div id="p-goals" class="panel">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Metas de Ahorro</span>
+          <button class="btn btn-primary btn-sm" onclick="showFormMeta()" style="margin:0">+ Nueva</button>
+        </div>
+        <div id="goals-list"></div>
+      </div>
+
+      <!-- Form Nueva Meta (Oculto) -->
+      <div class="card" id="goal-form" style="display:none">
+        <div class="card-title">Nueva Meta</div>
+        <div class="fg"><label>¿Qué quieres lograr?</label><input type="text" id="g-desc" placeholder="Ej: Viaje a Europa"></div>
+        <div class="form-2">
+          <div class="fg"><label>Monto Objetivo</label><input type="number" id="g-target" placeholder="0.00"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="g-moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg"><label>Monto Actual (Ahorrado)</label><input type="number" id="g-current" value="0"></div>
+        <button class="btn btn-primary" id="g-save-btn" onclick="saveMeta()">Guardar</button>
+        <button class="btn" onclick="hideFormMeta()">Cancelar</button>
+      </div>
+    </div>
+
+    <div id="p-met" class="panel">
+      <div class="card">
+        <div class="card-title">Filtros</div>
+        <div class="fg">
+          <label>Categorías</label>
+          <div class="ms-wrap">
+            <div class="ms-trigger" onclick="toggleMs('ms-met-cat', event)">
+              <span id="ms-met-cat-label">Todas</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+            </div>
+            <div class="ms-dropdown" id="ms-met-cat" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Evolución y Proyección</div>
+        <div class="chart-container" style="height: 280px;">
+          <canvas id="metEvolutionChart"></canvas>
+        </div>
+        <p style="font-size:10px;color:var(--text3);margin-top:8px">La última línea (punteada) representa la proyección basada en el promedio.</p>
+      </div>
+      
+      <div class="section-lbl">Resumen de Métricas</div>
+      <div class="metrics" id="met-stats-grid">
+        <!-- Se llena via JS -->
+      </div>
+
+      <div class="card">
+        <div class="card-title">Top Categorías (Últimos 3 meses)</div>
+        <div id="met-top-cats"></div>
       </div>
     </div>
 
@@ -1297,6 +1392,18 @@
       </svg>
       <span>Historial</span>
     </button>
+    <button class="nav-btn" id="nb-bal" onclick="switchTab('bal')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      </svg>
+      <span>Balance</span>
+    </button>
+    <button class="nav-btn" id="nb-goals" onclick="switchTab('goals')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+      </svg>
+      <span>Metas</span>
+    </button>
     <button class="nav-btn" id="nb-rep" onclick="switchTab('rep')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -1318,8 +1425,14 @@
       </svg>
       <span>Fijos</span>
     </button>
+    <button class="nav-btn" id="nb-met" onclick="switchTab('met')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+        <path d="M22 12A10 10 0 0 0 12 2v10z" />
+      </svg>
+      <span>Métricas</span>
+    </button>
     <button class="nav-btn" id="nb-cfg" onclick="switchTab('cfg')">
-
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <circle cx="12" cy="12" r="3" />
         <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
@@ -1386,6 +1499,8 @@
         if (session) {
           currentUser = session.user;
           await showApp();
+        } else {
+          showAuth();
         }
         sb.auth.onAuthStateChange(async (event, session) => {
           if (event === 'SIGNED_IN' && session) {
@@ -1420,16 +1535,30 @@
       document.getElementById('cfg-name').textContent = name;
 
       setSyncStatus('ok');
-      await loadCategorias();
-      await loadUsuarios();
-      await loadGastos();
-      await loadDeudas();
-      await loadRecurrentes();
-      await loadTarjetasConfig();
+      
+      // Pedir permiso para notificaciones
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      // Carga paralela para mayor velocidad
+      await Promise.all([
+        loadCategorias(),
+        loadUsuarios(),
+        loadGastos(),
+        loadDeudas(),
+        loadRecurrentes(),
+        loadTarjetasConfig(),
+        loadIngresos(),
+        loadGoals()
+      ]);
+      
       document.getElementById('pref-moneda').value = prefMoneda;
       fetchDolar();
-      // Realtime desactivado - usando polling
-      startPolling();
+      
+      // Activar Realtime en lugar de Polling
+      subscribeRealtime();
+      
       initForm();
       renderDash();
     }
@@ -1621,28 +1750,40 @@
       return { error };
     }
 
-    let pollingInterval = null;
-    function startPolling() {
-      if (pollingInterval) clearInterval(pollingInterval);
-      pollingInterval = setInterval(async () => {
-        if (!currentUser) return;
-        try {
+    let realtimeChannel = null;
+    function subscribeRealtime() {
+      if (realtimeChannel) sb.removeChannel(realtimeChannel);
+      
+      realtimeChannel = sb.channel('public:gastos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, async (payload) => {
+          // Recargar datos solo cuando sea necesario
           const { data } = await sb.from('gastos').select('*').order('fecha', { ascending: false });
           if (data) {
-            const prevCount = allGastos.length;
-            // Detectar gastos nuevos de la pareja
-            const newOnes = data.filter(g => g.user_id !== currentUser.id && !allGastos.find(x => x.id === g.id));
             allGastos = data;
             renderDash();
-            if (newOnes.length > 0) showToast('Tu pareja cargo ' + newOnes.length + ' gasto(s) nuevo(s)', 'info');
+            
+            // Notificación si el cambio es de otra persona
+            if (payload.eventType === 'INSERT' && payload.new.user_id !== currentUser.id) {
+              const partner = payload.new.persona || 'Tu pareja';
+              const monto = payload.new.moneda === 'USD' ? 'U$D ' + payload.new.monto : '$' + payload.new.monto;
+              
+              showToast(`${partner} cargó un gasto de ${monto}`, 'info');
+              
+              if (Notification.permission === 'granted') {
+                new Notification('💰 Nuevo Gasto Familiar', {
+                  body: `${partner} cargó: ${payload.new.descripcion || payload.new.categoria} por ${monto}`,
+                  icon: 'https://cdn-icons-png.flaticon.com/512/2454/2454282.png'
+                });
+              }
+            }
           }
-        } catch (e) { }
-      }, 30000);
+        })
+        .subscribe();
     }
+
     function stopPolling() {
-      if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
+      if (realtimeChannel) { sb.removeChannel(realtimeChannel); realtimeChannel = null; }
     }
-    function subscribeRealtime() { startPolling(); }
 
     // ─── HELPERS ─────────────────────────────────────────────────────────────────
     function fmt(n) { 
@@ -1692,15 +1833,23 @@
     // ─── TABS ────────────────────────────────────────────────────────────────────
     function switchTab(t) {
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      const tabs = ['home', 'nuevo', 'hist', 'rep', 'deu', 'rec', 'cfg'];
-      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', tabs[i] === t));
+      const tabs = ['home', 'nuevo', 'hist', 'bal', 'goals', 'rep', 'deu', 'rec', 'met', 'cfg'];
+      document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', b.id === 'nb-' + t));
       document.getElementById('p-' + t).classList.add('active');
       document.getElementById('app-content').scrollTop = 0;
+      
+      // Auto scroll navigation to keep active button visible
+      const activeBtn = document.getElementById('nb-' + t);
+      if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
       if (t === 'home') renderDash();
       if (t === 'nuevo') initForm();
       if (t === 'hist') { initHist(); loadHistorial(); }
+      if (t === 'bal') renderBalance();
+      if (t === 'goals') renderGoals();
       if (t === 'deu') renderDeudas();
       if (t === 'rec') renderRecurrentes();
+      if (t === 'met') renderMetrics();
       if (t === 'cfg') renderConfig();
     }
 
@@ -1776,7 +1925,17 @@
         .filter(g => g.persona !== miNombre && g.persona !== 'Ambos')
         .reduce((s, g) => s + getMontoARS(g), 0);
 
+      const totalIngresos = allIngresos
+        .filter(i => i.fecha && i.fecha.startsWith(ym))
+        .reduce((s, i) => s + getMontoARS(i), 0);
+      const balanceNeto = totalIngresos - total;
+
       document.getElementById('dash-metrics').innerHTML = `
+      <div class="metric" style="grid-column:1/-1; background:var(--surface2)">
+        <div class="metric-label">Balance Neto (Sobrante)</div>
+        <div class="metric-value ${balanceNeto >= 0 ? 'g' : 'r'}">${fmt(balanceNeto)}</div>
+        <div style="font-size:10px; color:var(--text3); margin-top:4px">Ingresos: ${fmt(totalIngresos)} | Gastos: ${fmt(total)}</div>
+      </div>
       <div class="metric" style="grid-column:1/-1">
         <div class="metric-label">Total del mes (Gastos + Pendientes)</div>
         <div class="metric-value">${fmt(total)}</div>
@@ -2624,11 +2783,14 @@
 
     // ─── EVOLUCIÓN (CHART) ───────────────────────────────────────────────────────
     let evoChart = null;
+    let metEvoChart = null;
+    let msMetCatSel = new Set();
+
     function renderEvolutionChart() {
       const ctx = document.getElementById('evolutionChart');
       if (!ctx) return;
-
-      const last12 = [];
+      
+      const data = [];
       const now = new Date();
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -2639,44 +2801,63 @@
             const m = parseFloat(g.monto || 0);
             return s + (g.moneda === 'USD' ? m * dolarHoy : m);
           }, 0);
-        const yearShort = d.getFullYear().toString().slice(-2);
-        last12.push({ label: `${MESES_SHORT[d.getMonth()]} ${yearShort}`, value: total });
+        data.push({ label: `${MESES_SHORT[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`, value: total });
       }
 
-
       if (evoChart) evoChart.destroy();
+      evoChart = drawLineChart(ctx, evoChart, [{ label: 'Gastos', data: data, color: '#1D9E75' }]);
+    }
+
+    function renderMetrics() {
+      const ctx = document.getElementById('metEvolutionChart');
+      if (!ctx) return;
+      
+      buildMsMetCat();
+      
+      const catsToShow = msMetCatSel.size > 0 ? Array.from(msMetCatSel) : categorias.map(c => c.nombre);
+      const datasets = getEvolutionDataByCategory(catsToShow, 3);
+      
+      if (metEvoChart) metEvoChart.destroy();
       
       const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
       const textColor = isDark ? '#9b9896' : '#6b6966';
 
-      evoChart = new Chart(ctx, {
+      metEvoChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: last12.map(m => m.label),
-          datasets: [{
-            label: 'Gastos',
-            data: last12.map(m => (prefMoneda === 'USD' ? m.value / dolarHoy : m.value)),
-            borderColor: '#1D9E75',
-            backgroundColor: 'rgba(29, 158, 117, 0.1)',
-            fill: true,
-            tension: 0.4,
+          labels: datasets[0].labels,
+          datasets: datasets.map(ds => ({
+            label: ds.label,
+            data: ds.values,
+            borderColor: ds.color,
+            backgroundColor: ds.color + '11',
+            fill: false,
+            tension: 0,
             borderWidth: 3,
-            pointRadius: 0,
-            pointHoverRadius: 6
-          }]
+            pointRadius: 4,
+            borderDash: (ctx) => ctx.index === (datasets[0].labels.length - 1) ? [5, 5] : [], // Punteado para el ultimo punto (proyeccion)
+            segment: {
+              borderDash: (ctx) => ctx.p0DataIndex === (datasets[0].labels.length - 2) ? [5, 5] : []
+            }
+          }))
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: { 
-            legend: { display: false }, 
+            legend: { 
+              display: true, 
+              position: 'top',
+              labels: { color: textColor, font: { size: 10 }, boxWidth: 10 }
+            }, 
             tooltip: { 
               mode: 'index', 
               intersect: false,
               callbacks: {
                 label: function(ctx) {
-                  return 'Total: ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR');
+                  const isProj = ctx.dataIndex === (ctx.dataset.data.length - 1);
+                  return ctx.dataset.label + ': ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR') + (isProj ? ' (Proj)' : '');
                 }
               }
             } 
@@ -2700,6 +2881,219 @@
           }
         }
       });
+      
+      renderMetricsStats();
+    }
+
+    function buildMsMetCat() {
+      const items = categorias.map(c => c.nombre);
+      const el = document.getElementById('ms-met-cat');
+      if (!el) return;
+      el.innerHTML =
+        `<div class="ms-item" onclick="msMetCatToggle('__all__')">
+          <div class="ms-check ${msMetCatSel.size === 0 ? 'on' : ''}"></div>
+          <span style="font-weight:600">Todas</span>
+        </div>` +
+        items.map(item =>
+          `<div class="ms-item" onclick="msMetCatToggle('${item}');event.stopPropagation()">
+            <div class="ms-check ${msMetCatSel.has(item) ? 'on' : ''}"></div>
+            <span>${item}</span>
+          </div>`
+        ).join('');
+      const lbl = document.getElementById('ms-met-cat-label');
+      if (msMetCatSel.size === 0) lbl.textContent = 'Todas';
+      else if (msMetCatSel.size === 1) lbl.textContent = Array.from(msMetCatSel)[0];
+      else lbl.textContent = `${msMetCatSel.size} categorías`;
+    }
+
+    function msMetCatToggle(val, event) {
+      if (event) event.stopPropagation();
+      if (val === '__all__') msMetCatSel.clear();
+      else {
+        if (msMetCatSel.has(val)) msMetCatSel.delete(val);
+        else msMetCatSel.add(val);
+      }
+      buildMsMetCat();
+      renderMetrics();
+    }
+
+    function getEvolutionDataByCategory(cats, months) {
+      const datasets = [];
+      const now = new Date();
+      const labels = [];
+      
+      // Etiquetas: meses anteriores + proyección
+      for (let i = months; i >= 1; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        labels.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
+      // Mes actual
+      labels.push(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+      // Mes proyección
+      const projDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      labels.push(`${projDate.getFullYear()}-${String(projDate.getMonth() + 1).padStart(2, '0')}`);
+
+      cats.forEach(catName => {
+        const values = [];
+        const cInfo = categorias.find(c => c.nombre === catName) || { color: '#888' };
+        
+        // Valores reales
+        for (let i = 0; i < labels.length - 1; i++) {
+          const ym = labels[i];
+          const total = allGastos
+            .filter(g => g.categoria === catName && g.fecha && g.fecha.startsWith(ym))
+            .reduce((s, g) => {
+              const m = parseFloat(g.monto || 0);
+              const mARS = g.moneda === 'USD' ? m * dolarHoy : m;
+              return s + (prefMoneda === 'USD' ? mARS / dolarHoy : mARS);
+            }, 0);
+          values.push(total);
+        }
+        
+        // Proyección: promedio de los últimos X meses (incluyendo el actual que puede estar incompleto, o solo los anteriores?)
+        // Vamos a usar el promedio de los meses reales mostrados
+        const avg = values.reduce((s, v) => s + v, 0) / (values.length);
+        values.push(avg);
+        
+        datasets.push({
+          label: catName,
+          labels: labels,
+          values: values,
+          color: cInfo.color
+        });
+      });
+      
+      return datasets;
+    }
+
+    function drawLineChart(ctx, chartInstance, datasets) {
+      if (chartInstance) chartInstance.destroy();
+      
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+      const textColor = isDark ? '#9b9896' : '#6b6966';
+
+      return new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: datasets[0].data.map(m => m.label),
+          datasets: datasets.map(ds => ({
+            label: ds.label,
+            data: ds.data.map(m => m.value),
+            borderColor: ds.color,
+            backgroundColor: ds.color + '11',
+            fill: true,
+            tension: 0,
+            borderWidth: 3,
+            pointRadius: 4,
+            pointBackgroundColor: ds.color,
+            pointHoverRadius: 6
+          }))
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { 
+            legend: { display: datasets.length > 1, labels: { color: textColor } }, 
+            tooltip: { 
+              mode: 'index', 
+              intersect: false,
+              callbacks: {
+                label: function(ctx) {
+                  return ctx.dataset.label + ': ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR');
+                }
+              }
+            } 
+          },
+          scales: {
+            y: { 
+              display: true, 
+              beginAtZero: true,
+              grid: { color: gridColor },
+              ticks: { 
+                color: textColor, 
+                font: { size: 9 },
+                callback: function(val) {
+                  if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
+                  if (val >= 1000) return (val/1000).toFixed(0) + 'k';
+                  return val;
+                }
+              }
+            },
+            x: { grid: { display: false }, ticks: { color: textColor, font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function renderMetricsStats() {
+      const now = new Date();
+      const ymCurrent = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const ymPrev = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+
+      const getMontoARS = (g) => {
+        const m = parseFloat(g.monto || 0);
+        return g.moneda === 'USD' ? m * dolarHoy : m;
+      };
+
+      const filterByCat = (g) => msMetCatSel.size === 0 || msMetCatSel.has(g.categoria);
+
+      const totalCurrent = allGastos
+        .filter(g => g.fecha && g.fecha.startsWith(ymCurrent) && filterByCat(g))
+        .reduce((s, g) => s + getMontoARS(g), 0);
+        
+      const totalPrev = allGastos
+        .filter(g => g.fecha && g.fecha.startsWith(ymPrev) && filterByCat(g))
+        .reduce((s, g) => s + getMontoARS(g), 0);
+      
+      const diff = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev * 100) : 0;
+      const diffText = totalPrev > 0 ? `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% vs mes ant.` : 'N/A';
+      const diffColor = diff > 0 ? 'var(--red)' : 'var(--green)';
+
+      const avg3 = allGastos.filter(g => {
+        const d = new Date(g.fecha);
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        return d >= threeMonthsAgo && filterByCat(g);
+      }).reduce((s, g) => s + getMontoARS(g), 0) / 3;
+
+      document.getElementById('met-stats-grid').innerHTML = `
+        <div class="metric">
+          <div class="metric-label">Gasto Mes Actual ${msMetCatSel.size > 0 ? '(Filtrado)' : ''}</div>
+          <div class="metric-value">${fmt(totalCurrent)}</div>
+          <div style="font-size:10px; color:${diffColor}; font-weight:700; margin-top:4px">${diffText}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Promedio (Últ. 3 meses)</div>
+          <div class="metric-value">${fmt(avg3)}</div>
+        </div>
+      `;
+
+      // Top categorías (siempre basado en lo seleccionado)
+      const catMap = {};
+      allGastos.filter(g => {
+        const d = new Date(g.fecha);
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        return d >= threeMonthsAgo && filterByCat(g);
+      }).forEach(g => {
+        catMap[g.categoria] = (catMap[g.categoria] || 0) + getMontoARS(g);
+      });
+
+      const top = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      document.getElementById('met-top-cats').innerHTML = top.map(([cat, val]) => `
+        <div class="cat-row">
+          <div class="cat-row-head">
+            <span class="cat-name"><span class="cat-dot" style="background:${catColor(cat)}"></span>${cat}</span>
+            <span class="cat-val">${fmt(val/3)}/mes</span>
+          </div>
+          <div class="bar-bg">
+            <div class="bar-fill" style="width:${(val / (top[0][1] || 1) * 100)}%;background:${catColor(cat)}"></div>
+          </div>
+        </div>
+      `).join('') || '<div class="empty">Sin datos suficientes</div>';
     }
 
     // ─── RECURRENTES ─────────────────────────────────────────────────────────────
@@ -2759,6 +3153,7 @@
       ['rf-desc', 'rf-monto'].forEach(id => document.getElementById(id).value = '');
     }
 
+
     async function saveRecurrente() {
       const desc = document.getElementById('rf-desc').value.trim();
       const monto = parseFloat(document.getElementById('rf-monto').value);
@@ -2774,13 +3169,12 @@
       const item = { descripcion: desc, monto, categoria: cat, persona, moneda, user_id: currentUser.id, user_email: currentUser.email };
       
       const { data, error } = await sb.from('recurrentes').insert([item]).select();
-
       
       btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
 
       if (error) { showToast('Error: ' + error.message, 'err'); }
       else {
-        allRecurrentes.push(data[0]);
+        if (data && data[0]) allRecurrentes.push(data[0]);
         hideFormRec();
         renderRecurrentes();
         showToast('Gasto fijo guardado ✓');
@@ -2800,7 +3194,6 @@
       if (!r) return;
 
       const hoy = new Date();
-      // Usar el mes seleccionado en el dashboard para la carga
       const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
       
       const gasto = { 
@@ -2814,7 +3207,6 @@
         user_id: currentUser.id, 
         user_email: currentUser.email 
       };
-
 
       showToast('Cargando...', 'info');
       const { error } = await sb.from('gastos').insert([gasto]);
@@ -2841,20 +3233,12 @@
       const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
       const nuevos = pendientes.map(r => ({
-        fecha, 
-        monto: r.monto, 
-        categoria: r.categoria, 
-        persona: r.persona, 
-        descripcion: r.descripcion, 
-        moneda: r.moneda || 'ARS',
-        notas: 'Carga automática masiva',
-        user_id: currentUser.id, 
-        user_email: currentUser.email 
+        fecha, monto: r.monto, categoria: r.categoria, persona: r.persona, 
+        descripcion: r.descripcion, moneda: r.moneda || 'ARS',
+        notas: 'Carga automática masiva', user_id: currentUser.id, user_email: currentUser.email 
       }));
 
-
       const { error } = await sb.from('gastos').insert(nuevos);
-      
       btn.innerHTML = 'Cargar todo'; btn.classList.remove('btn-loading');
 
       if (error) { showToast('Error: ' + error.message, 'err'); }
@@ -2865,7 +3249,146 @@
       }
     }
 
+    // ─── BALANCE E INGRESOS ─────────────────────────────────────────────────────
+    let allIngresos = [];
 
+    async function loadIngresos() {
+      const { data } = await sb.from('ingresos').select('*').order('fecha', { ascending: false });
+      if (data) allIngresos = data;
+    }
+
+    function showFormIngreso() {
+      document.getElementById('bal-form').style.display = 'block';
+      document.getElementById('i-fecha').value = new Date().toISOString().split('T')[0];
+      document.getElementById('i-moneda').value = prefMoneda;
+    }
+
+    function hideFormIngreso() {
+      document.getElementById('bal-form').style.display = 'none';
+    }
+
+    async function saveIngreso() {
+      const desc = document.getElementById('i-desc').value.trim();
+      const monto = parseFloat(document.getElementById('i-monto').value);
+      const moneda = document.getElementById('i-moneda').value;
+      const fecha = document.getElementById('i-fecha').value;
+      if (!desc || isNaN(monto) || !fecha) { showToast('Completá los datos', 'err'); return; }
+      const btn = document.getElementById('i-save-btn');
+      btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
+      const { error } = await sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]);
+      btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
+      if (error) showToast('Error: ' + error.message, 'err');
+      else { showToast('Ingreso guardado ✓'); hideFormIngreso(); await loadIngresos(); renderBalance(); }
+    }
+
+    function renderBalance() {
+      const ym = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}`;
+      const ingMes = allIngresos.filter(i => i.fecha && i.fecha.startsWith(ym));
+      const gastMes = allGastos.filter(g => g.fecha && g.fecha.startsWith(ym));
+      const getMontoARS = (val, mon) => mon === 'USD' ? val * dolarHoy : val;
+      const totalIng = ingMes.reduce((s, i) => s + getMontoARS(i.monto, i.moneda), 0);
+      const totalGast = gastMes.reduce((s, g) => s + getMontoARS(g.monto, g.moneda), 0);
+      const neto = totalIng - totalGast;
+      document.getElementById('bal-summary').innerHTML = `
+        <div class="metric">
+          <div class="metric-label">Ingresos</div>
+          <div class="metric-value g">${fmt(totalIng)}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Gastos</div>
+          <div class="metric-value r">${fmt(totalGast)}</div>
+        </div>
+        <div class="metric" style="grid-column:1/-1">
+          <div class="metric-label">Balance Neto (Sobrante)</div>
+          <div class="metric-value ${neto >= 0 ? 'g' : 'r'}">${fmt(neto)}</div>
+        </div>`;
+      document.getElementById('bal-ingresos-list').innerHTML = ingMes.length 
+        ? ingMes.map(i => `
+          <div class="tx-item">
+            <div class="tx-dot" style="background:var(--green)22">💰</div>
+            <div class="tx-info">
+              <div class="tx-desc">${i.descripcion}</div>
+              <div class="tx-meta">${fdate(i.fecha)}</div>
+            </div>
+            <div class="tx-right">
+              <div class="tx-amount" style="color:var(--green)">${fmtGasto(i.monto, i.moneda)}</div>
+              <button class="btn btn-danger btn-sm" onclick="deleteIngreso('${i.id}')" style="margin-top:4px;padding:2px 6px">🗑</button>
+            </div>
+          </div>`).join('')
+        : '<div class="empty">Sin ingresos este mes</div>';
+    }
+
+    async function deleteIngreso(id) {
+      if (!confirm('¿Eliminar ingreso?')) return;
+      await sb.from('ingresos').delete().eq('id', id);
+      await loadIngresos();
+      renderBalance();
+    }
+
+    // ─── METAS DE AHORRO ─────────────────────────────────────────────────────────
+    let allMetas = [];
+    async function loadGoals() {
+      const { data } = await sb.from('metas').select('*').order('created_at');
+      if (data) allMetas = data;
+    }
+    function showFormMeta() {
+      document.getElementById('goal-form').style.display = 'block';
+      document.getElementById('g-moneda').value = prefMoneda;
+    }
+    function hideFormMeta() {
+      document.getElementById('goal-form').style.display = 'none';
+    }
+    async function saveMeta() {
+      const desc = document.getElementById('g-desc').value.trim();
+      const target = parseFloat(document.getElementById('g-target').value);
+      const current = parseFloat(document.getElementById('g-current').value || 0);
+      const moneda = document.getElementById('g-moneda').value;
+      if (!desc || isNaN(target)) { showToast('Completá los datos', 'err'); return; }
+      const { error } = await sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]);
+      if (error) showToast('Error: ' + error.message, 'err');
+      else { showToast('Meta creada ✓'); hideFormMeta(); await loadGoals(); renderGoals(); }
+    }
+    function renderGoals() {
+      const el = document.getElementById('goals-list');
+      el.innerHTML = allMetas.length 
+        ? allMetas.map(m => {
+            const pct = Math.min(Math.round((m.monto_actual / m.monto_objetivo) * 100), 100);
+            return `
+            <div class="deu-card">
+              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+                <span style="font-weight:700">${m.descripcion}</span>
+                <span style="font-size:12px;color:var(--text2)">${pct}%</span>
+              </div>
+              <div class="deu-progress"><div class="deu-progress-fill" style="width:${pct}%;background:var(--green)"></div></div>
+              <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px">
+                <span>${fmtGasto(m.monto_actual, m.moneda)}</span>
+                <span style="color:var(--text3)">Meta: ${fmtGasto(m.monto_objetivo, m.moneda)}</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <button class="btn btn-sm" style="flex:1" onclick="updateMetaMonto('${m.id}')">Actualizar</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteMeta('${m.id}')">🗑</button>
+              </div>
+            </div>`;
+          }).join('')
+        : '<div class="empty">No tienes metas de ahorro todavía.</div>';
+    }
+    async function updateMetaMonto(id) {
+      const m = allMetas.find(x => x.id === id);
+      const nuevo = prompt(`¿Cuánto tienes ahorrado ahora para "${m.descripcion}"?`, m.monto_actual);
+      if (nuevo === null) return;
+      const val = parseFloat(nuevo);
+      if (isNaN(val)) return;
+      await sb.from('metas').update({ monto_actual: val }).eq('id', id);
+      await loadGoals();
+      renderGoals();
+      showToast('Meta actualizada ✓');
+    }
+    async function deleteMeta(id) {
+      if (!confirm('¿Eliminar meta?')) return;
+      await sb.from('metas').delete().eq('id', id);
+      await loadGoals();
+      renderGoals();
+    }
     // ─── START ───────────────────────────────────────────────────────────────────
 
     const now = new Date();
