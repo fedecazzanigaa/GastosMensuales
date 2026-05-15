@@ -47,34 +47,27 @@ async function init() {
   try {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    // Intentar obtener la sesión. Si el token es inválido, Supabase devolverá un error.
-    const { data: { session }, error } = await sb.auth.getSession();
+    const { data } = await sb.auth.getSession();
+    const session = data?.session;
     
-    if (error || !session) {
-      if (error) console.warn('Error de sesión inicial:', error.message);
-      showAuth();
-    } else {
+    if (session) {
       currentUser = session.user;
       await showApp();
+    } else {
+      showAuth();
     }
 
-    // Escuchar cambios de estado
     sb.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth event:', event);
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+      if (event === 'SIGNED_IN' && session) {
         currentUser = session.user;
         await showApp();
       } else if (event === 'SIGNED_OUT') {
         showAuth();
-      } else if (event === 'USER_UPDATED' && !session) {
-        // Manejo de tokens inválidos durante la ejecución
-        showAuth();
       }
     });
   } catch (e) {
-    console.error('Error crítico en init:', e);
+    console.error('Auth Init Error:', e);
     showAuth();
-    showToast('Sesión expirada. Por favor ingresá de nuevo.', 'err');
   }
 }
 
