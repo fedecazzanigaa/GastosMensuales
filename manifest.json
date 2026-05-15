@@ -2,7 +2,7 @@
   "name": "Gastos Familiares",
   "short_name": "Gastos",
   "description": "Control de gastos en pareja, siempre sincronizado",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1a1a18",

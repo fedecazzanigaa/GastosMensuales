@@ -130,8 +130,8 @@ async function showApp() {
 
   setSyncStatus('ok');
   
-  // Pedir permiso para notificaciones
-  if (Notification.permission === 'default') {
+  // Pedir permiso para notificaciones (solo si existe la API)
+  if (window.Notification && Notification.permission === 'default') {
     Notification.requestPermission();
   }
 
@@ -196,7 +196,8 @@ function requestNotificationPermission() {
 function updateNotifStatus() {
   const el = document.getElementById('notif-status');
   if (!el) return;
-  if (!("Notification" in window)) {
+  
+  if (!window.Notification) {
     el.textContent = "Navegador no compatible.";
   } else if (Notification.permission === "granted") {
     el.textContent = "✓ Notificaciones activadas.";
