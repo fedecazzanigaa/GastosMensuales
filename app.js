@@ -1,5 +1,12 @@
 // ─── CONFIG ─────────────────────────────────────────────────────────────────
-console.log("Gastos App v2.1 - Debugging active");
+console.log("Gastos App v2.2 - Diagnostic mode");
+
+// Atrapa errores globales para debug en móviles
+window.onerror = function(msg, url, line, col, error) {
+  alert("Error Detectado: " + msg + "\nEn: " + url + ":" + line + ":" + col);
+  return false;
+};
+
 // Reemplazá estos valores con los de tu proyecto Supabase
 const SUPABASE_URL = window.ENV_SUPABASE_URL || 'https://kgoupyevvazwfkrvekfu.supabase.co';
 const SUPABASE_KEY = window.ENV_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtnb3VweWV2dmF6d2ZrcnZla2Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDA4NjQsImV4cCI6MjA5NDI3Njg2NH0.kOPjymydE1ezGxMEIKhwhbIQmnxG5felXiURhaIyk6E';
@@ -44,11 +51,26 @@ let dashMonth = new Date(); dashMonth.setDate(1);
 
 // ─── INIT ────────────────────────────────────────────────────────────────────
 async function init() {
+  console.log("Iniciando aplicación...");
   try {
+    if (typeof supabase === 'undefined') {
+      alert("Error: No se pudo cargar la librería de Supabase. Verificá tu conexión.");
+      return;
+    }
+
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     
-    const { data } = await sb.auth.getSession();
-    const session = data?.session;
+    // Timeout de seguridad para la sesión inicial
+    const sessionPromise = sb.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout obteniendo sesión")), 10000));
+    
+    let session = null;
+    try {
+      const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+      session = data?.session;
+    } catch (err) {
+      console.warn("No se pudo obtener sesión inicial:", err.message);
+    }
     
     if (session) {
       currentUser = session.user;
@@ -58,6 +80,7 @@ async function init() {
     }
 
     sb.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event);
       if (event === 'SIGNED_IN' && session) {
         currentUser = session.user;
         await showApp();
@@ -66,7 +89,7 @@ async function init() {
       }
     });
   } catch (e) {
-    console.error('Auth Init Error:', e);
+    alert('Error crítico de inicio: ' + e.message);
     showAuth();
   }
 }
