@@ -85,16 +85,31 @@ function showAuth() {
 }
 
 async function showApp() {
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app-header').style.display = 'flex';
-  document.getElementById('app-content').style.display = 'block';
-  document.getElementById('app-nav').style.display = 'flex';
+  const panels = {
+    'auth-screen': 'none',
+    'app-header': 'flex',
+    'app-content': 'block',
+    'app-nav': 'flex'
+  };
+
+  for (const [id, display] of Object.entries(panels)) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = display;
+  }
+
+  if (!currentUser) return;
 
   const meta = currentUser.user_metadata;
   const name = meta?.name || currentUser.email.split('@')[0];
-  document.getElementById('header-user').textContent = `Hola, ${name}`;
-  document.getElementById('cfg-email').textContent = currentUser.email;
-  document.getElementById('cfg-name').textContent = name;
+
+  const elUser = document.getElementById('header-user');
+  if (elUser) elUser.textContent = `Hola, ${name}`;
+  
+  const elEmail = document.getElementById('cfg-email');
+  if (elEmail) elEmail.textContent = currentUser.email;
+  
+  const elName = document.getElementById('cfg-name');
+  if (elName) elName.textContent = name;
 
   setSyncStatus('ok');
   
