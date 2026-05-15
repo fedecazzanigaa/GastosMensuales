@@ -6,6 +6,17 @@ const SUPABASE_KEY = window.ENV_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ikp
 
 let sb, currentUser;
 
+/**
+ * Helper para ejecutar promesas con un tiempo de espera máximo.
+ * Evita que la app quede "clavada" si Supabase no responde.
+ */
+async function sbWithTimeout(promise, timeoutMs = 15000) {
+  const timeout = new Promise((_, reject) => 
+    setTimeout(() => reject(new Error('Tiempo de espera agotado (15s)')), timeoutMs)
+  );
+  return Promise.race([promise, timeout]);
+}
+
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 let allGastos = [];
 let allRecurrentes = [];
@@ -34,23 +45,35 @@ let dashMonth = new Date(); dashMonth.setDate(1);
 async function init() {
   try {
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) {
+    
+    // Intentar obtener la sesión. Si el token es inválido, Supabase devolverá un error.
+    const { data: { session }, error } = await sb.auth.getSession();
+    
+    if (error || !session) {
+      if (error) console.warn('Error de sesión inicial:', error.message);
+      showAuth();
+    } else {
       currentUser = session.user;
       await showApp();
-    } else {
-      showAuth();
     }
+
+    // Escuchar cambios de estado
     sb.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
+      console.log('Auth event:', event);
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
         currentUser = session.user;
         await showApp();
       } else if (event === 'SIGNED_OUT') {
         showAuth();
+      } else if (event === 'USER_UPDATED' && !session) {
+        // Manejo de tokens inválidos durante la ejecución
+        showAuth();
       }
     });
   } catch (e) {
-    showToast('Error de conexión con Supabase. Verificá la configuración.', 'err');
+    console.error('Error crítico en init:', e);
+    showAuth();
+    showToast('Sesión expirada. Por favor ingresá de nuevo.', 'err');
   }
 }
 
@@ -166,9 +189,14 @@ async function login() {
   if (!email || !pass) { showAuthError('Completá todos los campos'); return; }
   const btn = document.getElementById('login-btn');
   btn.innerHTML = '<span class="spinner"></span> Ingresando...'; btn.classList.add('btn-loading');
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  btn.innerHTML = 'Ingresar'; btn.classList.remove('btn-loading');
-  if (error) showAuthError(error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message);
+  try {
+    const { error } = await sbWithTimeout(sb.auth.signInWithPassword({ email, password: pass }));
+    if (error) throw error;
+  } catch (error) {
+    showAuthError(error.message === 'Invalid login credentials' ? 'Email o contraseña incorrectos' : error.message);
+  } finally {
+    btn.innerHTML = 'Ingresar'; btn.classList.remove('btn-loading');
+  }
 }
 
 async function register() {
@@ -179,24 +207,29 @@ async function register() {
   if (pass.length < 6) { showAuthError('La contraseña debe tener al menos 6 caracteres'); return; }
   const btn = document.getElementById('register-btn');
   btn.innerHTML = '<span class="spinner"></span> Creando cuenta...'; btn.classList.add('btn-loading');
-  const { data, error } = await sb.auth.signUp({
-    email,
-    password: pass,
-    options: { data: { name } }
-  });
+  
+  try {
+    const { data, error } = await sbWithTimeout(sb.auth.signUp({
+      email,
+      password: pass,
+      options: { data: { name } }
+    }));
 
-  if (!error && data?.user) {
-    await sb.from('profiles').insert([{
-      id: data.user.id,
-      name: name,
-      email: email
-    }]);
+    if (error) throw error;
+
+    if (data?.user) {
+      await sbWithTimeout(sb.from('profiles').insert([{
+        id: data.user.id,
+        name: name,
+        email: email
+      }]));
+    }
+    showAuthMsg('¡Cuenta creada! Revisá tu email para confirmar y luego ingresá.');
+  } catch (error) {
+    showAuthError(error.message);
+  } finally {
+    btn.innerHTML = 'Crear cuenta'; btn.classList.remove('btn-loading');
   }
-
-  btn.innerHTML = 'Crear cuenta'; btn.classList.remove('btn-loading');
-
-  if (error) showAuthError(error.message);
-  else showAuthMsg('¡Cuenta creada! Revisá tu email para confirmar y luego ingresá.');
 }
 
 async function forgotPass() {
@@ -260,17 +293,21 @@ async function loadTarjetasConfig() {
 }
 
 async function saveTarjetaConfig(tarjeta, dia_cierre) {
-  const { error } = await sb.from('tarjetas_config').upsert({ 
-    tarjeta, 
-    dia_cierre: parseInt(dia_cierre),
-    user_id: currentUser.id 
-  }, { onConflict: 'tarjeta' });
-  
-  if (error) showToast('Error al guardar config de tarjeta', 'err');
-  else {
+  try {
+    const { error } = await sbWithTimeout(sb.from('tarjetas_config').upsert({ 
+      tarjeta, 
+      dia_cierre: parseInt(dia_cierre),
+      user_id: currentUser.id 
+    }, { onConflict: 'tarjeta' }));
+    
+    if (error) throw error;
+    
     await loadTarjetasConfig();
     renderDeudas();
     showToast('Configuración de tarjeta guardada ✓');
+  } catch (error) {
+    console.error(error);
+    showToast('Error al guardar config de tarjeta: ' + (error.message || 'Error de conexión'), 'err');
   }
 }
 
@@ -295,21 +332,29 @@ async function loadGastos() {
 async function saveGastoToDB(gasto) {
   setSyncStatus('sync');
   try {
-    const { error } = await sb.from('gastos').insert([gasto]);
-    if (error) { setSyncStatus('err'); return { data: null, error }; }
+    const { error } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    if (error) { 
+      setSyncStatus('err'); 
+      return { data: null, error }; 
+    }
     setSyncStatus('ok');
     return { data: [gasto], error: null };
   } catch (e) {
     setSyncStatus('err');
-    return { data: null, error: { message: e.message } };
+    return { data: null, error: { message: e.message || 'Tiempo de espera agotado' } };
   }
 }
 
 async function deleteGastoDB(id) {
   setSyncStatus('sync');
-  const { error } = await sb.from('gastos').delete().eq('id', id);
-  setSyncStatus(error ? 'err' : 'ok');
-  return { error };
+  try {
+    const { error } = await sbWithTimeout(sb.from('gastos').delete().eq('id', id));
+    setSyncStatus(error ? 'err' : 'ok');
+    return { error };
+  } catch (e) {
+    setSyncStatus('err');
+    return { error: { message: e.message || 'Tiempo de espera agotado' } };
+  }
 }
 
 async function saveCategoriaDB(cat) {
@@ -618,12 +663,6 @@ async function saveGasto() {
   btn.innerHTML = '<span class="spinner"></span> Guardando...';
   btn.classList.add('btn-loading');
 
-  // Safety timer: 15 segundos máximo
-  const safetyTimer = setTimeout(() => {
-    resetSaveBtn();
-    showToast('Tiempo de espera agotado. Intentá de nuevo.', 'err');
-  }, 15000);
-
   try {
     // Optimistic UI: agregar localmente de inmediato
     const id_temp = 'tmp_' + Date.now();
@@ -647,7 +686,6 @@ async function saveGasto() {
   } catch (e) {
     showToast('Error inesperado: ' + e.message, 'err');
   } finally {
-    clearTimeout(safetyTimer);
     resetSaveBtn();
   }
 }
@@ -978,13 +1016,18 @@ async function addCategoria() {
   const color = document.getElementById('new-cat-color').value;
   if (!nombre) { showToast('Escribí el nombre', 'err'); return; }
   if (categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) { showToast('Ya existe esa categoría', 'err'); return; }
-  const { data, error } = await sb.from('categorias').insert([{ nombre, color, presupuesto }]).select();
-  if (error) { showToast('Error al guardar: ' + error.message, 'err'); return; }
-  if (data) categorias.push(data[0]);
-  document.getElementById('new-cat').value = '';
-  document.getElementById('new-cat-ppto').value = '';
-  renderConfig(); initForm();
-  showToast('Categoría agregada ✓');
+  
+  try {
+    const { data, error } = await sbWithTimeout(sb.from('categorias').insert([{ nombre, color, presupuesto }]).select());
+    if (error) throw error;
+    if (data) categorias.push(data[0]);
+    document.getElementById('new-cat').value = '';
+    document.getElementById('new-cat-ppto').value = '';
+    renderConfig(); initForm();
+    showToast('Categoría agregada ✓');
+  } catch (error) {
+    showToast('Error al guardar: ' + error.message, 'err');
+  }
 }
 
 function renderConfig() {
@@ -1040,13 +1083,15 @@ async function deleteCategoria(id) {
 
 async function updateCategoriaPpto(id, ppto) {
   const valor = parseFloat(ppto || 0);
-  const { error } = await sb.from('categorias').update({ presupuesto: valor }).eq('id', id);
-  if (error) showToast('Error al actualizar presupuesto', 'err');
-  else {
+  try {
+    const { error } = await sbWithTimeout(sb.from('categorias').update({ presupuesto: valor }).eq('id', id));
+    if (error) throw error;
     const cat = categorias.find(c => c.id === id);
     if (cat) cat.presupuesto = valor;
     renderDash();
     showToast('Presupuesto actualizado ✓');
+  } catch (error) {
+    showToast('Error al actualizar presupuesto: ' + error.message, 'err');
   }
 }
 
@@ -1103,25 +1148,19 @@ async function saveDeuda() {
     cuotas_pagas:0, mes_inicio:inicio, tarjeta, persona, notas,
     monto_cuota: Math.round(monto/cuotas*100)/100,
     user_id: currentUser.id, user_email: currentUser.email };
-  const safetyTimer = setTimeout(() => {
-    btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
-    showToast('Tiempo de espera agotado. Intentá de nuevo.', 'err');
-  }, 15000);
+  
   try {
-    const { error } = await sb.from('deudas').insert([deuda]);
-    if (error) {
-      showToast('Error: ' + error.message, 'err');
-    } else {
-      allDeudas.unshift({...deuda, id: Date.now()});
-      hideFormDeuda();
-      renderDeudas();
-      renderDash();
-      showToast('Deuda guardada ✓');
-    }
+    const { error } = await sbWithTimeout(sb.from('deudas').insert([deuda]));
+    if (error) throw error;
+    
+    allDeudas.unshift({...deuda, id: Date.now()});
+    hideFormDeuda();
+    renderDeudas();
+    renderDash();
+    showToast('Deuda guardada ✓');
   } catch(e) {
-    showToast('Error inesperado: ' + e.message, 'err');
+    showToast('Error: ' + e.message, 'err');
   } finally {
-    clearTimeout(safetyTimer);
     btn.innerHTML = 'Guardar';
     btn.classList.remove('btn-loading');
   }
@@ -1129,11 +1168,15 @@ async function saveDeuda() {
 
 async function deleteDeuda(id) {
   if (!confirm('¿Eliminar esta deuda?')) return;
-  const { error } = await sb.from('deudas').delete().eq('id', id);
-  if (error) { showToast('Error al eliminar', 'err'); return; }
-  allDeudas = allDeudas.filter(d => d.id !== id);
-  renderDeudas();
-  showToast('Deuda eliminada');
+  try {
+    const { error } = await sbWithTimeout(sb.from('deudas').delete().eq('id', id));
+    if (error) throw error;
+    allDeudas = allDeudas.filter(d => d.id !== id);
+    renderDeudas();
+    showToast('Deuda eliminada');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
 }
 
 let deudaEnPago = null;
@@ -1165,35 +1208,39 @@ async function confirmarPagoCuota() {
   
   showToast('Procesando pago...', 'info');
   
-  // 1. Actualizar la deuda
-  const { error: errorDeuda } = await sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id);
-  if (errorDeuda) { showToast('Error al actualizar deuda', 'err'); return; }
-  
-  // 2. Crear un gasto automático para que se vea en el dashboard
-  const gasto = {
-    fecha: fechaPago,
-    monto: d.monto_cuota,
-    moneda: d.moneda,
-    categoria: 'Deudas',
-    persona: d.persona,
-    descripcion: `Pago Cuota ${nuevasPagas}/${d.cuotas_total}: ${d.descripcion}`,
-    notas: `Pago de cuota de ${d.tarjeta}. Deuda ID: ${d.id}`,
-    user_id: currentUser.id,
-    user_email: currentUser.email
-  };
-  
-  const { error: errorGasto } = await sb.from('gastos').insert([gasto]);
-  
-  if (errorGasto) {
-    showToast('Cuota marcada, pero no se pudo crear el gasto', 'warn');
-  } else {
-    showToast('Cuota pagada y registrada en gastos ✓');
-  }
+  try {
+    // 1. Actualizar la deuda
+    const { error: errorDeuda } = await sbWithTimeout(sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id));
+    if (errorDeuda) throw errorDeuda;
+    
+    // 2. Crear un gasto automático para que se vea en el dashboard
+    const gasto = {
+      fecha: fechaPago,
+      monto: d.monto_cuota,
+      moneda: d.moneda,
+      categoria: 'Deudas',
+      persona: d.persona,
+      descripcion: `Pago Cuota ${nuevasPagas}/${d.cuotas_total}: ${d.descripcion}`,
+      notas: `Pago de cuota de ${d.tarjeta}. Deuda ID: ${d.id}`,
+      user_id: currentUser.id,
+      user_email: currentUser.email
+    };
+    
+    const { error: errorGasto } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    
+    if (errorGasto) {
+      showToast('Cuota marcada, pero no se pudo crear el gasto', 'warn');
+    } else {
+      showToast('Cuota pagada y registrada en gastos ✓');
+    }
 
-  d.cuotas_pagas = nuevasPagas;
-  await loadGastos(); // Recargar para que aparezca en el dash
-  renderDeudas();
-  renderDash();
+    d.cuotas_pagas = nuevasPagas;
+    await loadGastos(); // Recargar para que aparezca en el dash
+    renderDeudas();
+    renderDash();
+  } catch (error) {
+    showToast('Error al procesar pago: ' + error.message, 'err');
+  }
 }
 
 function getCuotasMes(yearMonth) {
@@ -1740,25 +1787,31 @@ async function saveRecurrente() {
 
   const item = { descripcion: desc, monto, categoria: cat, persona, moneda, user_id: currentUser.id, user_email: currentUser.email };
   
-  const { data, error } = await sb.from('recurrentes').insert([item]).select();
-  
-  btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
-
-  if (error) { showToast('Error: ' + error.message, 'err'); }
-  else {
+  try {
+    const { data, error } = await sbWithTimeout(sb.from('recurrentes').insert([item]).select());
+    if (error) throw error;
     if (data && data[0]) allRecurrentes.push(data[0]);
     hideFormRec();
     renderRecurrentes();
     showToast('Gasto fijo guardado ✓');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
+  } finally {
+    btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
   }
 }
 
 async function deleteRecurrente(id) {
   if (!confirm('¿Eliminar este gasto fijo?')) return;
-  const { error } = await sb.from('recurrentes').delete().eq('id', id);
-  if (error) { showToast('Error al eliminar', 'err'); return; }
-  allRecurrentes = allRecurrentes.filter(r => r.id !== id);
-  renderRecurrentes();
+  try {
+    const { error } = await sbWithTimeout(sb.from('recurrentes').delete().eq('id', id));
+    if (error) throw error;
+    allRecurrentes = allRecurrentes.filter(r => r.id !== id);
+    renderRecurrentes();
+    showToast('Gasto fijo eliminado');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
 }
 
 async function cargarGastoRecurrente(id) {
@@ -1781,13 +1834,14 @@ async function cargarGastoRecurrente(id) {
   };
 
   showToast('Cargando...', 'info');
-  const { error } = await sb.from('gastos').insert([gasto]);
-
-  if (error) { showToast('Error: ' + error.message, 'err'); }
-  else {
+  try {
+    const { error } = await sbWithTimeout(sb.from('gastos').insert([gasto]));
+    if (error) throw error;
     await loadGastos();
     renderRecurrentes();
     showToast('Gasto cargado al mes actual ✓');
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
   }
 }
 
@@ -1810,14 +1864,16 @@ async function cargarTodosRecurrentes() {
     notas: 'Carga automática masiva', user_id: currentUser.id, user_email: currentUser.email 
   }));
 
-  const { error } = await sb.from('gastos').insert(nuevos);
-  btn.innerHTML = 'Cargar todo'; btn.classList.remove('btn-loading');
-
-  if (error) { showToast('Error: ' + error.message, 'err'); }
-  else {
+  try {
+    const { error } = await sbWithTimeout(sb.from('gastos').insert(nuevos));
+    if (error) throw error;
     await loadGastos();
     renderRecurrentes();
     showToast(`Se cargaron ${nuevos.length} gastos fijos ✓`);
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
+  } finally {
+    btn.innerHTML = 'Cargar todo'; btn.classList.remove('btn-loading');
   }
 }
 
@@ -1847,10 +1903,18 @@ async function saveIngreso() {
   if (!desc || isNaN(monto) || !fecha) { showToast('Completá los datos', 'err'); return; }
   const btn = document.getElementById('i-save-btn');
   btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
-  const { error } = await sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]);
-  btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
-  if (error) showToast('Error: ' + error.message, 'err');
-  else { showToast('Ingreso guardado ✓'); hideFormIngreso(); await loadIngresos(); renderBalance(); }
+  try {
+    const { error } = await sbWithTimeout(sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]));
+    if (error) throw error;
+    showToast('Ingreso guardado ✓'); 
+    hideFormIngreso(); 
+    await loadIngresos(); 
+    renderBalance();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
+  } finally {
+    btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
+  }
 }
 
 function renderBalance() {
@@ -1892,9 +1956,15 @@ function renderBalance() {
 
 async function deleteIngreso(id) {
   if (!confirm('¿Eliminar ingreso?')) return;
-  await sb.from('ingresos').delete().eq('id', id);
-  await loadIngresos();
-  renderBalance();
+  try {
+    const { error } = await sbWithTimeout(sb.from('ingresos').delete().eq('id', id));
+    if (error) throw error;
+    await loadIngresos();
+    renderBalance();
+    showToast('Ingreso eliminado ✓');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
 }
 
 // ─── METAS DE AHORRO ─────────────────────────────────────────────────────────
@@ -1916,9 +1986,22 @@ async function saveMeta() {
   const current = parseFloat(document.getElementById('g-current').value || 0);
   const moneda = document.getElementById('g-moneda').value;
   if (!desc || isNaN(target)) { showToast('Completá los datos', 'err'); return; }
-  const { error } = await sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]);
-  if (error) showToast('Error: ' + error.message, 'err');
-  else { showToast('Meta creada ✓'); hideFormMeta(); await loadGoals(); renderGoals(); }
+  
+  const btn = document.getElementById('g-save-btn');
+  if (btn) { btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading'); }
+  
+  try {
+    const { error } = await sbWithTimeout(sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]));
+    if (error) throw error;
+    showToast('Meta creada ✓'); 
+    hideFormMeta(); 
+    await loadGoals(); 
+    renderGoals();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
+  } finally {
+    if (btn) { btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading'); }
+  }
 }
 function renderGoals() {
   const el = document.getElementById('goals-list');
@@ -1950,16 +2033,27 @@ async function updateMetaMonto(id) {
   if (nuevo === null) return;
   const val = parseFloat(nuevo);
   if (isNaN(val)) return;
-  await sb.from('metas').update({ monto_actual: val }).eq('id', id);
-  await loadGoals();
-  renderGoals();
-  showToast('Meta actualizada ✓');
+  try {
+    const { error } = await sbWithTimeout(sb.from('metas').update({ monto_actual: val }).eq('id', id));
+    if (error) throw error;
+    await loadGoals();
+    renderGoals();
+    showToast('Meta actualizada ✓');
+  } catch (error) {
+    showToast('Error al actualizar meta: ' + error.message, 'err');
+  }
 }
 async function deleteMeta(id) {
   if (!confirm('¿Eliminar meta?')) return;
-  await sb.from('metas').delete().eq('id', id);
-  await loadGoals();
-  renderGoals();
+  try {
+    const { error } = await sbWithTimeout(sb.from('metas').delete().eq('id', id));
+    if (error) throw error;
+    await loadGoals();
+    renderGoals();
+    showToast('Meta eliminada');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
 }
 // ─── START ───────────────────────────────────────────────────────────────────
 
