@@ -7,6 +7,7 @@
   --text2: #6b6966;
   --text3: #9b9896;
   --accent: #1a1a18;
+  --text-on-accent: #f5f5f0;
   --green: #1D9E75;
   --red: #D85A30;
   --blue: #185FA5;
@@ -34,16 +35,26 @@
     border: 1.5px solid var(--accent) !important;
   }
   input[type="date"]::-webkit-calendar-picker-indicator {
-    filter: invert(1);
+    filter: brightness(0) invert(1);
     opacity: 0.7;
   }
   input[type="date"] {
     color-scheme: dark;
   }
-}
+  /* Cubre date, month, datetime-local en WebKit (Chrome, Edge, Safari) */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="month"]::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    filter: brightness(0) invert(1);
+    opacity: 0.7;
+  }
 
-:root {
-  --text-on-accent: #f5f5f0;
+  /* Para todos los tipos de fecha, fuerza color-scheme oscuro */
+  input[type="date"],
+  input[type="month"],
+  input[type="datetime-local"] {
+    color-scheme: dark;
+  }
 }
 
 * {
@@ -252,11 +263,10 @@ body {
   background: var(--surface);
   border-top: 1px solid var(--border);
   display: none;
-  padding-bottom: calc(var(--sb) + 12px);
+  padding-bottom: calc(var(--sb) + 8px);
   z-index: 10;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  justify-content: space-around;
+  align-items: center;
 }
 
 .nav::-webkit-scrollbar {
@@ -264,7 +274,7 @@ body {
 }
 
 .nav-btn {
-  flex: 0 0 85px;
+  flex: 1;
   border: none;
   background: none;
   padding: 10px 4px 8px;
@@ -288,6 +298,71 @@ body {
 }
 
 .nav-btn span {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* FAB BUTTON */
+.nav-fab {
+  position: relative;
+  top: -15px;
+  margin-bottom: -15px;
+  background-color: var(--accent) !important;
+  color: var(--text-on-accent) !important;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  padding: 0;
+}
+
+.nav-fab svg {
+  stroke-width: 2.5;
+}
+
+.nav-fab span {
+  display: none;
+}
+
+/* MAS MENU */
+.mas-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.mas-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 8px;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.mas-btn:active {
+  opacity: 0.7;
+}
+
+.mas-btn svg {
+  width: 24px;
+  height: 24px;
+  color: var(--blue);
+}
+
+.mas-btn span {
   font-size: 11px;
   font-weight: 600;
 }

@@ -50,6 +50,7 @@ document.addEventListener('visibilitychange', () => {
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 let allGastos = [];
+let editGastoId = null;
 let allRecurrentes = [];
 let dolarHoy = 1200; 
 let prefMoneda = localStorage.getItem('prefMoneda') || 'ARS';
@@ -439,6 +440,22 @@ async function saveGastoToDB(gasto) {
   }
 }
 
+async function updateGastoDB(id, gasto) {
+  setSyncStatus('sync');
+  try {
+    const { error } = await sbWithTimeout(() => sb.from('gastos').update(gasto).eq('id', id));
+    if (error) { 
+      setSyncStatus('err'); 
+      return { data: null, error }; 
+    }
+    setSyncStatus('ok');
+    return { data: [gasto], error: null };
+  } catch (e) {
+    setSyncStatus('err');
+    return { data: null, error: { message: e.message || 'Tiempo de espera agotado' } };
+  }
+}
+
 async function deleteGastoDB(id) {
   setSyncStatus('sync');
   try {
@@ -549,7 +566,7 @@ const fmtDeuda = fmtGasto;
 // ─── TABS ────────────────────────────────────────────────────────────────────
 function switchTab(t) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const tabs = ['home', 'nuevo', 'hist', 'bal', 'goals', 'rep', 'deu', 'rec', 'met', 'cfg'];
+  const tabs = ['home', 'nuevo', 'hist', 'bal', 'goals', 'rep', 'deu', 'rec', 'met', 'cfg', 'mas'];
   document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', b.id === 'nb-' + t));
   document.getElementById('p-' + t).classList.add('active');
   document.getElementById('app-content').scrollTop = 0;
@@ -701,6 +718,39 @@ function renderDash() {
     }).join('')
     : '<div class="empty"><div class="empty-icon">📊</div>Sin gastos en este mes</div>';
 
+  const ctxDonut = document.getElementById('donutChart');
+  if (ctxDonut) {
+    if (window.donutChartInstance) window.donutChartInstance.destroy();
+    
+    const labels = sorted.map(x => x[0]);
+    const data = sorted.map(x => x[1]);
+    const bgColors = labels.map(cat => catColor(cat));
+    
+    if (typeof Chart !== 'undefined') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        window.donutChartInstance = new Chart(ctxDonut, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: data,
+              backgroundColor: bgColors,
+              borderWidth: isDark ? 2 : 1,
+              borderColor: isDark ? '#1a1a18' : '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            cutout: '70%'
+          }
+        });
+    }
+  }
+
   const recent = mg.slice(0, 5);
   document.getElementById('dash-recent').innerHTML = recent.length
     ? recent.map(g => `<div class="tx-item">
@@ -769,22 +819,39 @@ async function saveGasto() {
     const montoFinal = Number(monto.toFixed(2));
     if (montoFinal > 99999999) { throw new Error('El monto es demasiado alto'); }
 
-    const id_temp = 'tmp_' + Date.now();
-    const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
-    allGastos.unshift(gasto);
-    renderDash();
-
-    const { id: _drop, ...gastoSB } = gasto;
-    const { error } = await saveGastoToDB(gastoSB);
-
-    if (error) {
-      allGastos = allGastos.filter(g => g.id !== id_temp);
-      renderDash();
-      showToast('Error: ' + error.message, 'err');
+    if (editGastoId) {
+      const gastoSB = { fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas };
+      const { error } = await updateGastoDB(editGastoId, gastoSB);
+      if (error) {
+        showToast('Error al actualizar: ' + error.message, 'err');
+      } else {
+        const index = allGastos.findIndex(g => g.id === editGastoId);
+        if (index > -1) {
+          allGastos[index] = { ...allGastos[index], ...gastoSB };
+        }
+        showToast('Gasto actualizado ✓');
+        clearForm();
+        renderDash();
+        switchTab('hist');
+      }
     } else {
-      showToast('Gasto guardado ✓');
-      clearForm();
-      document.getElementById('f-monto').focus();
+      const id_temp = 'tmp_' + Date.now();
+      const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+      allGastos.unshift(gasto);
+      renderDash();
+
+      const { id: _drop, ...gastoSB } = gasto;
+      const { error } = await saveGastoToDB(gastoSB);
+
+      if (error) {
+        allGastos = allGastos.filter(g => g.id !== id_temp);
+        renderDash();
+        showToast('Error: ' + error.message, 'err');
+      } else {
+        showToast('Gasto guardado ✓');
+        clearForm();
+        document.getElementById('f-monto').focus();
+      }
     }
   } catch (e) {
     showToast(e.message || 'Error inesperado', 'err');
@@ -797,6 +864,66 @@ function clearForm() {
   document.getElementById('f-monto').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notas').value = '';
+  editGastoId = null;
+  const btn = document.getElementById('save-btn');
+  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12" /></svg> Guardar gasto`;
+}
+
+//function editarGasto(id) {
+//  const g = allGastos.find(x => x.id === id);
+//  if (!g) return;
+//  
+//  switchTab('nuevo'); // Se llama primero para que initForm() genere los combos y defaults
+//  
+//  editGastoId = id;
+//  document.getElementById('f-fecha').value = g.fecha || '';
+//  document.getElementById('f-monto').value = g.monto || '';
+//  document.getElementById('f-moneda').value = g.moneda || 'ARS';
+//  document.getElementById('f-cat').value = g.categoria || '';
+//  document.getElementById('f-persona').value = g.persona || '';
+//  document.getElementById('f-desc').value = g.descripcion || '';
+//  document.getElementById('f-notas').value = g.notas || '';
+//  
+//  const btn = document.getElementById('save-btn');
+//  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Actualizar gasto`;
+//}
+
+// Reemplazá la función editarGasto completa con esta versión:
+
+function editarGasto(id) {
+  const g = allGastos.find(x => x.id === id);
+  if (!g) return;
+  
+  // Primero cambiamos de pestaña (esto NO debe ejecutar initForm automáticamente)
+  // En lugar de switchTab que llama a initForm, cambiamos manualmente
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('p-nuevo').classList.add('active');
+  document.getElementById('nb-nuevo').classList.add('active');
+  document.getElementById('app-content').scrollTop = 0;
+  
+  // Ahora sí, asignamos los valores del gasto a los campos (sin initForm de por medio)
+  document.getElementById('f-fecha').value = g.fecha || '';
+  document.getElementById('f-monto').value = g.monto || '';
+  document.getElementById('f-moneda').value = g.moneda || 'ARS';
+  
+  // Asegurar que los selects tengan opciones cargadas (si no lo están)
+  if (document.getElementById('f-cat').options.length === 0) {
+    document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  }
+  if (document.getElementById('f-persona').options.length === 0) {
+    document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+  }
+  
+  document.getElementById('f-cat').value = g.categoria || '';
+  document.getElementById('f-persona').value = g.persona || '';
+  document.getElementById('f-desc').value = g.descripcion || '';
+  document.getElementById('f-notas').value = g.notas || '';
+  
+  editGastoId = id;
+  
+  const btn = document.getElementById('save-btn');
+  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Actualizar gasto`;
 }
 
 // ─── HISTORIAL ───────────────────────────────────────────────────────────────
@@ -907,10 +1034,14 @@ function initHist() {
 function loadHistorial() {
   document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
   const mes = document.getElementById('h-mes').value;
+  const busq = document.getElementById('h-busq')?.value.toLowerCase().trim();
   let f = allGastos;
   if (mes) f = f.filter(g => g.fecha && g.fecha.startsWith(mes));
   if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
   if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
+  if (busq) {
+    f = f.filter(g => (g.descripcion || '').toLowerCase().includes(busq) || (g.notas || '').toLowerCase().includes(busq));
+  }
   // La lista ya viene ordenada de la DB por fecha y created_at
   f = f.slice();
   
@@ -932,7 +1063,10 @@ function loadHistorial() {
     <div class="tx-right">
       <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
       <div class="tx-date">${fdate(g.fecha)}</div>
-      <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
+      <div style="display:flex;gap:4px;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
+      </div>
     </div>
 
   </div>`).join('')
@@ -1030,7 +1164,8 @@ function exportarExcel() {
   };
 
   list.forEach(g => {
-    const montoConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+    const montoConsolidadoRaw = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+    const montoConsolidado = prefMoneda === 'USD' ? Number(montoConsolidadoRaw.toFixed(2)) : montoConsolidadoRaw;
     data.push([
       fdate(g.fecha), 
       g.descripcion || '', 
@@ -1044,13 +1179,54 @@ function exportarExcel() {
   });
 
   const totalARS = list.reduce((s, g) => s + getMontoARS(g), 0);
-  const totalConsolidado = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+  const totalConsolidadoRaw = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+  const totalConsolidado = prefMoneda === 'USD' ? Number(totalConsolidadoRaw.toFixed(2)) : totalConsolidadoRaw;
   
   data.push(['', '', '', 'TOTAL CONSOLIDADO', totalConsolidado, '', prefMoneda, '']);
   
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
+
+  // --- NUEVA SOLAPA: POR CATEGORÍA ---
+  const resumenData = [['Categoría', 'Fecha', 'Descripción', `Monto (${prefMoneda})`]];
+  
+  const listSorted = [...list].sort((a, b) => {
+    if (a.categoria < b.categoria) return -1;
+    if (a.categoria > b.categoria) return 1;
+    return (a.fecha || '').localeCompare(b.fecha || '');
+  });
+
+  let currentCat = null;
+  let subtotalCat = 0;
+
+  listSorted.forEach(g => {
+    const montoRaw = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+    const monto = prefMoneda === 'USD' ? Number(montoRaw.toFixed(2)) : montoRaw;
+    if (currentCat !== g.categoria) {
+      if (currentCat !== null) {
+        resumenData.push(['', '', 'SUBTOTAL ' + currentCat.toUpperCase(), prefMoneda === 'USD' ? Number(subtotalCat.toFixed(2)) : subtotalCat]);
+        resumenData.push([]); // Espacio visual
+      }
+      currentCat = g.categoria;
+      subtotalCat = 0;
+    }
+    subtotalCat += monto;
+    resumenData.push([g.categoria, fdate(g.fecha), g.descripcion || '', monto]);
+  });
+
+  if (currentCat !== null) {
+    resumenData.push(['', '', 'SUBTOTAL ' + currentCat.toUpperCase(), prefMoneda === 'USD' ? Number(subtotalCat.toFixed(2)) : subtotalCat]);
+  }
+  
+  resumenData.push([]);
+  resumenData.push(['', '', 'TOTAL GENERAL', totalConsolidado]);
+  
+  const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
+  wsResumen['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Por Categoría');
+  // ------------------------------------
+
   XLSX.writeFile(wb, `Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.xlsx`);
   showToast('Excel exportado ✓');
 }
@@ -1082,11 +1258,13 @@ function exportarPDF() {
   let y = 45;
   Object.entries(catMap).sort((a, b) => b[1] - a[1]).forEach(([c, v]) => {
     doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    doc.text(`${c}: ${fmt(v)}`, 18, y); y += 6;
+    const vConsolidado = prefMoneda === 'USD' ? (v / dolarHoy) : v;
+    doc.text(`${c}: ${prefMoneda === 'USD' ? 'U$D ' : '$'} ${vConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 18, y); y += 6;
   });
 
   y += 4; doc.setFont('helvetica', 'bold');
-  doc.text(`TOTAL GENERAL: ${fmt(totalARS)}`, 14, y); y += 10;
+  const tConsolidado = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+  doc.text(`TOTAL GENERAL: ${prefMoneda === 'USD' ? 'U$D ' : '$'} ${tConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, y); y += 10;
 
   doc.autoTable({
     head: [['Fecha', 'Descripción', 'Categoría', 'Persona', `Monto (${prefMoneda})`]],
@@ -1098,7 +1276,7 @@ function exportarPDF() {
         g.descripcion || '', 
         g.categoria, 
         g.persona, 
-        symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2 })
+        symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       ];
     }),
     startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [26, 26, 24] },

@@ -109,6 +109,9 @@
 
       <div class="card">
         <div class="card-title">Por categoría</div>
+        <div class="chart-container" style="height: 200px; margin-bottom: 16px;">
+          <canvas id="donutChart"></canvas>
+        </div>
         <div id="dash-cats"></div>
       </div>
       <div class="card" id="dash-deudas" style="display:none"></div>
@@ -153,6 +156,10 @@
 
     <!-- HISTORIAL -->
     <div id="p-hist" class="panel">
+      <div class="fg">
+        <label>Buscar</label>
+        <input type="text" id="h-busq" placeholder="Buscar por descripción o notas..." oninput="loadHistorial()">
+      </div>
       <!-- Fila 1: Mes y Categoría -->
       <div class="filter-2" style="margin-bottom:10px">
         <div class="fg">
@@ -470,6 +477,55 @@
       </div>
     </div>
 
+    <!-- MÁS (MENÚ) -->
+    <div id="p-mas" class="panel">
+      <div class="card">
+        <div class="card-title">Más opciones</div>
+        <div class="mas-grid">
+          <button class="mas-btn" onclick="switchTab('bal')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            <span>Balance</span>
+          </button>
+          <button class="mas-btn" onclick="switchTab('goals')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+            </svg>
+            <span>Metas</span>
+          </button>
+          <button class="mas-btn" onclick="switchTab('rep')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
+            </svg>
+            <span>Reportes</span>
+          </button>
+          <button class="mas-btn" onclick="switchTab('rec')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+            </svg>
+            <span>Fijos</span>
+          </button>
+          <button class="mas-btn" onclick="switchTab('met')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+              <path d="M22 12A10 10 0 0 0 12 2v10z" />
+            </svg>
+            <span>Métricas</span>
+          </button>
+          <button class="mas-btn" onclick="switchTab('cfg')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
+            </svg>
+            <span>Configuración</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- BOTTOM NAV -->
@@ -483,14 +539,6 @@
       </svg>
       <span>Resumen</span>
     </button>
-    <button class="nav-btn" id="nb-nuevo" onclick="switchTab('nuevo')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="16" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-      <span>Nuevo</span>
-    </button>
     <button class="nav-btn" id="nb-hist" onclick="switchTab('hist')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
         <line x1="8" y1="6" x2="21" y2="6" />
@@ -502,25 +550,12 @@
       </svg>
       <span>Historial</span>
     </button>
-    <button class="nav-btn" id="nb-bal" onclick="switchTab('bal')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    <button class="nav-btn nav-fab" id="nb-nuevo" onclick="switchTab('nuevo')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="5" x2="12" y2="19" />
+        <line x1="5" y1="12" x2="19" y2="12" />
       </svg>
-      <span>Balance</span>
-    </button>
-    <button class="nav-btn" id="nb-goals" onclick="switchTab('goals')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      </svg>
-      <span>Metas</span>
-    </button>
-    <button class="nav-btn" id="nb-rep" onclick="switchTab('rep')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
-      </svg>
-      <span>Reportes</span>
+      <span>Nuevo</span>
     </button>
     <button class="nav-btn" id="nb-deu" onclick="switchTab('deu')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -529,25 +564,13 @@
       </svg>
       <span>Deudas</span>
     </button>
-    <button class="nav-btn" id="nb-rec" onclick="switchTab('rec')">
+    <button class="nav-btn" id="nb-mas" onclick="switchTab('mas')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="18" x2="21" y2="18" />
       </svg>
-      <span>Fijos</span>
-    </button>
-    <button class="nav-btn" id="nb-met" onclick="switchTab('met')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-        <path d="M22 12A10 10 0 0 0 12 2v10z" />
-      </svg>
-      <span>Métricas</span>
-    </button>
-    <button class="nav-btn" id="nb-cfg" onclick="switchTab('cfg')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M17.66 7.34a6 6 0 0 1 0 9.32M6.34 7.34a6 6 0 0 0 0 9.32" />
-      </svg>
-      <span>Config</span>
+      <span>Más</span>
     </button>
   </nav>
 
