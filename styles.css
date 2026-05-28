@@ -67,9 +67,8 @@
 }
 
 .donut-layout-chart {
-  flex: 1;
-  min-width: 150px;
-  height: 180px;
+  flex: 0 0 180px;  /* Ancho fijo, no se estira */
+  height: 180px;     /* Altura fija como estaba antes */
 }
 
 .donut-layout-list {
