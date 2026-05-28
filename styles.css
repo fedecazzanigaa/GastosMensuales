@@ -57,6 +57,40 @@
   }
 }
 
+/* 28.05.26 */
+/* Layout para gráfico de anillo + lista lado a lado */
+.donut-layout {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.donut-layout-chart {
+  flex: 1;
+  min-width: 150px;
+  height: 180px;
+}
+
+.donut-layout-list {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* En móviles muy chicos, se apila verticalmente */
+@media (max-width: 480px) {
+  .donut-layout {
+    flex-direction: column;
+  }
+  .donut-layout-chart {
+    width: 100%;
+  }
+  .donut-layout-list {
+    width: 100%;
+  }
+}
+/* 28.05.26 */
+
 * {
   box-sizing: border-box;
   margin: 0;
