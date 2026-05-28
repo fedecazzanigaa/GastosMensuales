@@ -575,6 +575,11 @@ function switchTab(t) {
   const activeBtn = document.getElementById('nb-' + t);
   if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
+  // 👇 NUEVO: Si cambiamos a la pestaña "nuevo", limpiamos el estado de edición
+  if (t === 'nuevo') {
+    clearForm();  // Limpia el formulario y resetea editGastoId
+  }
+  
   if (t === 'home') renderDash();
   if (t === 'nuevo') initForm();
   if (t === 'hist') { initHist(); loadHistorial(); }
