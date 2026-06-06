@@ -427,13 +427,13 @@ async function loadGastos() {
 async function saveGastoToDB(gasto) {
   setSyncStatus('sync');
   try {
-    const { error } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
+    const { data, error } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]).select('id').single());
     if (error) { 
       setSyncStatus('err'); 
       return { data: null, error }; 
     }
     setSyncStatus('ok');
-    return { data: [gasto], error: null };
+    return { data, error: null };
   } catch (e) {
     setSyncStatus('err');
     return { data: null, error: { message: e.message || 'Tiempo de espera agotado' } };
@@ -773,6 +773,280 @@ function renderDash() {
     : '<div class="empty"><div class="empty-icon">🧾</div>Sin gastos recientes</div>';
 }
 
+// ─── ADJUNTOS/COMPROBANTES ───────────────────────────────────────────────────
+let adjuntosTemp = []; // Almacena archivos seleccionados temporalmente
+
+function getFileIcon(tipo) {
+  if (tipo.startsWith('image/')) return '📷';
+  if (tipo === 'application/pdf') return '📄';
+  return '📎';
+}
+
+function updateAdjuntoPreview() {
+  const input = document.getElementById('f-adjunto');
+  const preview = document.getElementById('f-adjunto-preview');
+  
+  if (!input || !preview) return;
+  
+  if (input.files.length === 0 && adjuntosTemp.length === 0) {
+    preview.style.display = 'none';
+    return;
+  }
+  
+  let html = '<div class="adjunto-preview">';
+  
+  // Archivos nuevos (del input)
+  if (input.files.length > 0) {
+    for (let file of input.files) {
+      const icon = getFileIcon(file.type);
+      const size = (file.size / 1024).toFixed(1);
+      html += `
+        <div class="adjunto-item">
+          <div class="adjunto-icon">${icon}</div>
+          <div class="adjunto-name" title="${file.name}">${file.name}</div>
+          <span style="font-size:10px;color:var(--text3)">(${size}KB)</span>
+          <button type="button" class="adjunto-remove" onclick="removeNewFile('${file.name}')" title="Eliminar">✕</button>
+        </div>
+      `;
+    }
+  }
+  
+  // Archivos existentes (adjuntosTemp)
+  if (adjuntosTemp.length > 0) {
+    for (let adj of adjuntosTemp) {
+      const icon = getFileIcon(adj.tipo);
+      const size = (adj.tamano / 1024).toFixed(1);
+      html += `
+        <div class="adjunto-item" style="opacity:0.6">
+          <div class="adjunto-icon">${icon}</div>
+          <div class="adjunto-name" title="${adj.nombre}">${adj.nombre}</div>
+          <span style="font-size:10px;color:var(--text3)">(${size}KB)</span>
+          <button type="button" class="adjunto-remove" onclick="removeExistingFile('${adj.id}')" title="Eliminar">✕</button>
+        </div>
+      `;
+    }
+  }
+  
+  html += '</div>';
+  preview.innerHTML = html;
+  preview.style.display = 'block';
+}
+
+function removeNewFile(fileName) {
+  const input = document.getElementById('f-adjunto');
+  const dataTransfer = new DataTransfer();
+  
+  for (let i = 0; i < input.files.length; i++) {
+    if (input.files[i].name !== fileName) {
+      dataTransfer.items.add(input.files[i]);
+    }
+  }
+  
+  input.files = dataTransfer.files;
+  updateAdjuntoPreview();
+}
+
+function removeExistingFile(adjId) {
+  adjuntosTemp = adjuntosTemp.filter(a => a.id !== adjId);
+  updateAdjuntoPreview();
+}
+
+async function uploadAdjunto(file, gastoId) {
+  try {
+    const fileName = `${Date.now()}_${file.name}`.replace(/[^\w\-\.]/g, '_');
+    const path = `${currentUser.id}/${gastoId}/${fileName}`;
+    
+    setSyncStatus('sync');
+    
+    const { error } = await sb.storage
+      .from('comprobantes')
+      .upload(path, file, { upsert: false });
+    
+    if (error) throw error;
+    
+    return {
+      id: path,
+      nombre: file.name,
+      path,
+      tipo: file.type,
+      tamano: file.size,
+      fecha: new Date().toISOString()
+    };
+  } catch (e) {
+    console.error('Error subiendo archivo:', e);
+    throw e;
+  }
+}
+
+async function deleteAdjunto(path) {
+  try {
+    setSyncStatus('sync');
+    
+    const { error } = await sb.storage
+      .from('comprobantes')
+      .remove([path]);
+    
+    if (error) throw error;
+    
+    return true;
+  } catch (e) {
+    console.error('Error eliminando archivo:', e);
+    throw e;
+  }
+}
+
+async function downloadAdjunto(path, nombre) {
+  try {
+    const { data, error } = await sb.storage.from('comprobantes').download(path);
+    if (error) {
+      console.error('Error descargando adjunto:', error);
+      showToast(error.message || 'No se puede descargar este archivo', 'err');
+      return;
+    }
+
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nombre || path.split('/').pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    console.error('Error al descargar adjunto:', e);
+    showToast('Error al descargar', 'err');
+  }
+}
+
+async function viewAdjunto(path, tipo) {
+  try {
+    const { data, error } = await sb.storage.from('comprobantes').download(path);
+    if (error) {
+      console.error('Error viendo adjunto:', error);
+      showToast(error.message || 'No se puede ver este archivo', 'err');
+      return;
+    }
+
+    const url = URL.createObjectURL(data);
+    const overlay = document.createElement('div');
+    overlay.className = 'lightbox-overlay';
+    overlay.onclick = (e) => {
+      if (e.target === overlay) overlay.remove();
+    };
+
+    const content = document.createElement('div');
+    content.className = 'lightbox-content';
+
+    if (tipo.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = url;
+      content.appendChild(img);
+    } else if (tipo === 'application/pdf') {
+      const embed = document.createElement('embed');
+      embed.src = url;
+      embed.type = 'application/pdf';
+      embed.style.width = '100%';
+      embed.style.height = '100%';
+      content.appendChild(embed);
+    } else {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.textContent = 'Abrir archivo en nueva pestaña';
+      content.appendChild(link);
+    }
+
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      overlay.remove();
+    };
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'lightbox-close';
+    closeBtn.innerHTML = '✕';
+    closeBtn.onclick = cleanup;
+    content.appendChild(closeBtn);
+
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => {
+      if (e.target === overlay) cleanup();
+    };
+  } catch (e) {
+    console.error('Error al ver adjunto:', e);
+    showToast('Error al ver archivo', 'err');
+  }
+}
+
+function toggleAdjuntosPanel(panelId) {
+  const panel = document.getElementById(panelId);
+  if (panel) {
+    panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  }
+}
+
+async function deleteAdjuntoFromGasto(gastoId, adjuntoId) {
+  if (!confirm('¿Eliminar este comprobante?')) return;
+  
+  try {
+    const gasto = allGastos.find(g => g.id === gastoId);
+    if (!gasto) return;
+    
+    // Eliminar del storage
+    await deleteAdjunto(adjuntoId);
+    
+    // Actualizar gasto en BD
+    const adjuntosActualizados = (gasto.adjuntos || []).filter(a => a.id !== adjuntoId);
+    await updateGastoDB(gastoId, { adjuntos: adjuntosActualizados });
+    
+    // Actualizar en memoria
+    gasto.adjuntos = adjuntosActualizados;
+    
+    showToast('Comprobante eliminado ✓');
+    loadHistorial();
+  } catch (e) {
+    console.error('Error:', e);
+    showToast('Error al eliminar comprobante', 'err');
+  }
+}
+
+async function agregarAdjuntoAlGasto(gastoId) {
+  const gasto = allGastos.find(g => g.id === gastoId);
+  if (!gasto) return;
+  
+  // Crear input file temporal
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*,.pdf';
+  input.onchange = async (e) => {
+    const files = e.target.files;
+    if (files.length === 0) return;
+    
+    try {
+      const adjuntosExistentes = gasto.adjuntos || [];
+      const adjuntosNuevos = [];
+      
+      for (let file of files) {
+        const adjunto = await uploadAdjunto(file, gastoId);
+        adjuntosNuevos.push(adjunto);
+      }
+      
+      const adjuntosActualizados = [...adjuntosExistentes, ...adjuntosNuevos];
+      await updateGastoDB(gastoId, { adjuntos: adjuntosActualizados });
+      
+      gasto.adjuntos = adjuntosActualizados;
+      
+      showToast(`${adjuntosNuevos.length} archivo(s) agregado(s) ✓`);
+      loadHistorial();
+    } catch (e) {
+      console.error('Error:', e);
+      showToast('Error al subir archivo', 'err');
+    }
+  };
+  
+  input.click();
+}
+
 // ─── NUEVO GASTO ─────────────────────────────────────────────────────────────
 function initForm() {
   const now = new Date();
@@ -794,6 +1068,12 @@ function initForm() {
   if (currentProfile && fper) {
     fper.value = currentProfile.name;
     if (fperLbl) fperLbl.textContent = currentProfile.name;
+  }
+  
+  // Inicializar listener para input de archivos
+  const adjuntoInput = document.getElementById('f-adjunto');
+  if (adjuntoInput) {
+    adjuntoInput.addEventListener('change', updateAdjuntoPreview);
   }
 }
 
@@ -885,6 +1165,33 @@ async function saveGasto() {
         if (index > -1) {
           allGastos[index] = { ...allGastos[index], ...gastoSB };
         }
+        
+        // Subir adjuntos nuevos si existen
+        const adjuntoInput = document.getElementById('f-adjunto');
+        if (adjuntoInput && adjuntoInput.files.length > 0) {
+          btn.innerHTML = '<span class="spinner"></span> Subiendo archivos...';
+          const gasto = allGastos[index];
+          const adjuntosActuales = gasto.adjuntos || [];
+          const adjuntosSubidos = [];
+          
+          for (let file of adjuntoInput.files) {
+            try {
+              const adjunto = await uploadAdjunto(file, editGastoId);
+              adjuntosSubidos.push(adjunto);
+            } catch (err) {
+              console.error('Error subiendo archivo:', err);
+              showToast(`Error subiendo ${file.name}`, 'err');
+            }
+          }
+          
+          // Actualizar gasto con adjuntos nuevos
+          if (adjuntosSubidos.length > 0) {
+            const adjuntosFinales = [...adjuntosActuales, ...adjuntosSubidos];
+            await updateGastoDB(editGastoId, { adjuntos: adjuntosFinales });
+            gasto.adjuntos = adjuntosFinales;
+          }
+        }
+        
         showToast('Gasto actualizado ✓');
         clearForm();
         renderDash();
@@ -892,18 +1199,46 @@ async function saveGasto() {
       }
     } else {
       const id_temp = 'tmp_' + Date.now();
-      const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+      const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email, adjuntos: [] };
       allGastos.unshift(gasto);
       renderDash();
 
       const { id: _drop, ...gastoSB } = gasto;
-      const { error } = await saveGastoToDB(gastoSB);
+      const { data, error } = await saveGastoToDB(gastoSB);
 
       if (error) {
         allGastos = allGastos.filter(g => g.id !== id_temp);
         renderDash();
         showToast('Error: ' + error.message, 'err');
       } else {
+        const gastoInsertado = data || {};
+        const gastoIndex = allGastos.findIndex(g => g.id === id_temp);
+        if (gastoIndex > -1) {
+          allGastos[gastoIndex] = { ...allGastos[gastoIndex], ...gastoInsertado };
+        }
+
+        const gastoGuardado = gastoIndex > -1 ? allGastos[gastoIndex] : gastoInsertado;
+        const adjuntoInput = document.getElementById('f-adjunto');
+        if (adjuntoInput && adjuntoInput.files.length > 0 && gastoGuardado?.id) {
+          btn.innerHTML = '<span class="spinner"></span> Subiendo archivos...';
+          const adjuntosSubidos = [];
+          for (let file of adjuntoInput.files) {
+            try {
+              const adjunto = await uploadAdjunto(file, gastoGuardado.id);
+              adjuntosSubidos.push(adjunto);
+            } catch (err) {
+              console.error('Error subiendo archivo:', err);
+              showToast(`Error subiendo ${file.name}`, 'err');
+            }
+          }
+          if (adjuntosSubidos.length > 0) {
+            await updateGastoDB(gastoGuardado.id, { adjuntos: adjuntosSubidos });
+            if (gastoIndex > -1) {
+              allGastos[gastoIndex].adjuntos = adjuntosSubidos;
+            }
+          }
+        }
+
         showToast('Gasto guardado ✓');
         clearForm();
         document.getElementById('f-monto').focus();
@@ -920,6 +1255,14 @@ function clearForm() {
   document.getElementById('f-monto').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notas').value = '';
+  
+  // Limpiar adjuntos
+  const adjuntoInput = document.getElementById('f-adjunto');
+  if (adjuntoInput) adjuntoInput.value = '';
+  adjuntosTemp = [];
+  const preview = document.getElementById('f-adjunto-preview');
+  if (preview) preview.style.display = 'none';
+  
   editGastoId = null;
   const btn = document.getElementById('save-btn');
   if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12" /></svg> Guardar gasto`;
@@ -1202,22 +1545,50 @@ function loadHistorial() {
 
   document.getElementById('hist-list').innerHTML = f.length
     ? `<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${f.length} gastos · <strong>${fmt(total)}</strong></div>` +
-    f.map(g => `<div class="tx-item">
-    <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
-    <div class="tx-info">
-      <div class="tx-desc">${g.descripcion || g.categoria}</div>
-      <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
-    </div>
-    <div class="tx-right">
-      <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
-      <div class="tx-date">${fdate(g.fecha)}</div>
-      <div style="display:flex;gap:4px;justify-content:flex-end">
-        <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
-      </div>
-    </div>
-
-  </div>`).join('')
+    f.map(g => {
+      const adjuntos = g.adjuntos || [];
+      const hasAdjuntos = adjuntos.length > 0;
+      const adjuntosHtml = hasAdjuntos ? `
+        <div class="adjuntos-historial" style="display:none" id="info-adjuntos-${g.id}">
+          <span style="font-size:11px;color:var(--text2)">📎 ${adjuntos.length} ${adjuntos.length === 1 ? 'archivo' : 'archivos'}</span>
+        </div>
+      ` : '';
+      
+      const adjuntosPanelHtml = hasAdjuntos ? `
+        <div id="panel-${g.id}" class="adjunto-gallery" style="display:none">
+          ${adjuntos.map(adj => `
+            <div class="adjunto-gallery-item">
+              <div class="adjunto-gallery-name">${getFileIcon(adj.tipo)} ${adj.nombre}</div>
+              <div class="adjunto-gallery-actions" style="display:flex;gap:4px">
+                <button class="adjunto-btn" onclick="viewAdjunto('${adj.path}', '${adj.tipo}')" title="Ver archivo" style="width:28px;height:28px">👁️</button>
+                <button class="adjunto-btn" onclick="downloadAdjunto('${adj.path}', '${adj.nombre}')" title="Descargar" style="width:28px;height:28px">⬇️</button>
+                <button class="adjunto-btn adjunto-btn-danger" onclick="deleteAdjuntoFromGasto('${g.id}', '${adj.id}')" title="Eliminar" style="width:28px;height:28px">🗑</button>
+              </div>
+            </div>
+          `).join('')}
+          <button class="btn btn-primary btn-sm" onclick="agregarAdjuntoAlGasto('${g.id}')" style="width:100%;margin-top:8px">+ Agregar archivo</button>
+        </div>
+      ` : '';
+      
+      return `<div class="tx-item">
+        <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
+        <div class="tx-info">
+          <div class="tx-desc">${g.descripcion || g.categoria}</div>
+          <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
+          ${adjuntosHtml}
+          ${adjuntosPanelHtml}
+        </div>
+        <div class="tx-right">
+          <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
+          <div class="tx-date">${fdate(g.fecha)}</div>
+          <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
+            ${hasAdjuntos ? `<button class="btn btn-sm" onclick="toggleAdjuntosPanel('panel-${g.id}')" title="${adjuntos.length} archivo(s)" style="margin-top:4px;padding:3px 6px;font-size:14px;border:1px solid rgba(26, 158, 117, 0.3);background:rgba(26, 158, 117, 0.05);position:relative">📎</button>` : ''}
+            <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('')
     : '<div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div>';
 }
 
