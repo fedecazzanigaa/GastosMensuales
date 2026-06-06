@@ -143,12 +143,12 @@
           </div>
         </div>
         <div class="form-2">
-          <div class="fg"><label>Categoría</label><select id="f-cat"></select></div>
+          <div class="fg"><label>Categoría</label><select id="f-cat" onchange="handleSelectChange(this)"></select></div>
           <div class="fg"><label>¿Quién pagó?</label>
-            <select id="f-persona"></select>
+            <select id="f-persona" onchange="handleSelectChange(this)"></select>
           </div>
         </div>
-        <div class="fg"><label>Descripción</label><input type="text" id="f-desc" placeholder="Ej: Supermercado Coto, factura luz..."></div>
+        <div class="fg"><label>Descripción</label><input type="text" id="f-desc" placeholder="Ej: Supermercado Coto, factura luz..." autocorrect="off" spellcheck="false"></div>
         <div class="fg"><label>Notas (opcional)</label><textarea id="f-notas" placeholder="Detalles adicionales..."></textarea></div>
         <button class="btn btn-primary" id="save-btn" onclick="saveGasto()">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">

@@ -563,6 +563,20 @@ body {
   border-color: var(--accent);
 }
 
+/* Mobile: Asegurar que el input de descripción sea siempre interactuable */
+#f-desc {
+  pointer-events: auto !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -webkit-touch-callout: default !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+#f-desc:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .form-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
