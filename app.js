@@ -951,27 +951,19 @@ function toggleMs(id, event) {
 }
 
 // Listener global optimizado para evitar cierres de teclado en móviles
-// Diferimos el cierre (setTimeout 0) para no interferir con el comportamiento
-// nativo de los <select> (evita que un segundo select se abra y se cierre).
 document.addEventListener('click', e => {
-  if (e.target.closest('.ms-wrap')) return; // interacción dentro del ms
-
-  // Deferir el cierre para que el navegador procese primero el evento nativo
-  // (esto evita que los <select> nativos se cierren inmediatamente en algunos navegadores/móviles)
-  setTimeout(() => {
+  if (!e.target.closest('.ms-wrap')) {
     const drops = document.querySelectorAll('.ms-dropdown');
-    drops.forEach(d => { if (d.style.display !== 'none') d.style.display = 'none'; });
-  }, 0);
+    let anyOpen = false;
+    drops.forEach(d => { if(d.style.display !== 'none') anyOpen = true; });
+    
+    if (anyOpen) {
+      drops.forEach(d => {
+        if (d.style.display !== 'none') d.style.display = 'none';
+      });
+    }
+  }
 });
-
-// Cerrar multiselects cuando el usuario enfoca el input de búsqueda en Historial.
-// Esto mantiene el comportamiento esperado (buscar cierra filtros abiertos).
-const _histSearch = document.getElementById('h-busq');
-if (_histSearch) {
-  _histSearch.addEventListener('focus', () => {
-    document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
-  });
-}
 
 function buildMsCat() {
   const items = categorias.map(c => c.nombre);
@@ -2202,9 +2194,6 @@ function showFormIngreso() {
   document.getElementById('bal-form').style.display = 'block';
   document.getElementById('i-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('i-moneda').value = prefMoneda;
-  document.getElementById('i-desc').value = '';
-  document.getElementById('i-monto').value = '';
-  document.getElementById('i-desc').focus();
 }
 
 function hideFormIngreso() {
