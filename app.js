@@ -2,7 +2,7 @@
 console.log("Gastos App v2.2 - Diagnostic mode");
 
 // Atrapa errores globales para debug en móviles
-window.onerror = function(msg, url, line, col, error) {
+window.onerror = function (msg, url, line, col, error) {
   alert("Error Detectado: " + msg + "\nEn: " + url + ":" + line + ":" + col);
   return false;
 };
@@ -22,7 +22,7 @@ async function sbWithTimeout(promiseFn, timeoutMs = 12000, retries = 1) {
   for (let i = 0; i <= retries; i++) {
     try {
       const promise = typeof promiseFn === 'function' ? promiseFn() : promiseFn;
-      const timeout = new Promise((_, reject) => 
+      const timeout = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Tiempo de espera agotado')), timeoutMs)
       );
       return await Promise.race([promise, timeout]);
@@ -50,9 +50,8 @@ document.addEventListener('visibilitychange', () => {
 
 const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 let allGastos = [];
-let editGastoId = null;
 let allRecurrentes = [];
-let dolarHoy = 1200; 
+let dolarHoy = 1200;
 let prefMoneda = localStorage.getItem('prefMoneda') || 'ARS';
 let tarjetasCfg = [
   { tarjeta: 'Visa', dia_cierre: 15, dia_vencimiento: 25 },
@@ -99,10 +98,10 @@ async function init() {
     }
 
     sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    
+
     const { data } = await sb.auth.getSession();
     const session = data?.session;
-    
+
     if (session && !isAppLoaded) {
       currentUser = session.user;
       isAppLoaded = true;
@@ -155,15 +154,15 @@ async function showApp() {
 
   const elUser = document.getElementById('header-user');
   if (elUser) elUser.textContent = `Hola, ${name}`;
-  
+
   const elEmail = document.getElementById('cfg-email');
   if (elEmail) elEmail.textContent = currentUser.email;
-  
+
   const elName = document.getElementById('cfg-name');
   if (elName) elName.textContent = name;
 
   setSyncStatus('ok');
-  
+
   // Pedir permiso para notificaciones (solo si existe la API)
   if (window.Notification && Notification.permission === 'default') {
     Notification.requestPermission();
@@ -180,15 +179,14 @@ async function showApp() {
     loadIngresos(),
     loadGoals()
   ]);
-  
+
   document.getElementById('pref-moneda').value = prefMoneda;
   fetchDolar();
-  
+
   // Activar Realtime
   subscribeRealtime();
-  
+
   initForm();
-  setupFormHandlers();
   renderDash();
   updateNotifStatus();
 }
@@ -208,7 +206,7 @@ function requestNotificationPermission() {
     updateNotifStatus();
     if (permission === "granted") {
       showToast("¡Notificaciones activadas! ✓");
-      new Notification("Gastos Familiares", { 
+      new Notification("Gastos Familiares", {
         body: "Las notificaciones están configuradas correctamente.",
         icon: 'https://cdn-icons-png.flaticon.com/512/2454/2454282.png'
       });
@@ -231,7 +229,7 @@ function requestNotificationPermission() {
 function updateNotifStatus() {
   const el = document.getElementById('notif-status');
   if (!el) return;
-  
+
   if (!window.Notification) {
     el.textContent = "Navegador no compatible.";
   } else if (Notification.permission === "granted") {
@@ -294,7 +292,7 @@ async function register() {
   if (pass.length < 6) { showAuthError('La contraseña debe tener al menos 6 caracteres'); return; }
   const btn = document.getElementById('register-btn');
   btn.innerHTML = '<span class="spinner"></span> Creando cuenta...'; btn.classList.add('btn-loading');
-  
+
   try {
     const { data, error } = await sbWithTimeout(() => sb.auth.signUp({
       email,
@@ -385,14 +383,14 @@ async function loadTarjetasConfig() {
 
 async function saveTarjetaConfig(tarjeta, dia_cierre) {
   try {
-    const { error } = await sbWithTimeout(() => sb.from('tarjetas_config').upsert({ 
-      tarjeta, 
+    const { error } = await sbWithTimeout(() => sb.from('tarjetas_config').upsert({
+      tarjeta,
       dia_cierre: parseInt(dia_cierre),
-      user_id: currentUser.id 
+      user_id: currentUser.id
     }, { onConflict: 'tarjeta' }));
-    
+
     if (error) throw error;
-    
+
     await loadTarjetasConfig();
     renderDeudas();
     showToast('Configuración de tarjeta guardada ✓');
@@ -418,9 +416,9 @@ async function loadGastos() {
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
 
-  if (data) { 
-    allGastos = data; 
-    renderDash(); 
+  if (data) {
+    allGastos = data;
+    renderDash();
     renderEvolutionChart();
   }
 }
@@ -429,25 +427,9 @@ async function saveGastoToDB(gasto) {
   setSyncStatus('sync');
   try {
     const { error } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
-    if (error) { 
-      setSyncStatus('err'); 
-      return { data: null, error }; 
-    }
-    setSyncStatus('ok');
-    return { data: [gasto], error: null };
-  } catch (e) {
-    setSyncStatus('err');
-    return { data: null, error: { message: e.message || 'Tiempo de espera agotado' } };
-  }
-}
-
-async function updateGastoDB(id, gasto) {
-  setSyncStatus('sync');
-  try {
-    const { error } = await sbWithTimeout(() => sb.from('gastos').update(gasto).eq('id', id));
-    if (error) { 
-      setSyncStatus('err'); 
-      return { data: null, error }; 
+    if (error) {
+      setSyncStatus('err');
+      return { data: null, error };
     }
     setSyncStatus('ok');
     return { data: [gasto], error: null };
@@ -482,7 +464,7 @@ async function deleteCategoriaDB(id) {
 let realtimeChannel = null;
 function subscribeRealtime() {
   if (realtimeChannel) sb.removeChannel(realtimeChannel);
-  
+
   realtimeChannel = sb.channel('public:gastos')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, async (payload) => {
       // Recargar datos solo cuando sea necesario
@@ -495,14 +477,14 @@ function subscribeRealtime() {
       if (data) {
         allGastos = data;
         renderDash();
-        
+
         // Notificación si el cambio es de otra persona
         if (payload.eventType === 'INSERT' && payload.new.user_id !== currentUser.id) {
           const partner = payload.new.persona || 'Tu pareja';
           const monto = payload.new.moneda === 'USD' ? 'U$D ' + payload.new.monto : '$' + payload.new.monto;
-          
+
           showToast(`${partner} cargó un gasto de ${monto}`, 'info');
-          
+
           if (Notification.permission === 'granted') {
             new Notification('💰 Nuevo Gasto Familiar', {
               body: `${partner} cargó: ${payload.new.descripcion || payload.new.categoria} por ${monto}`,
@@ -520,14 +502,14 @@ function stopPolling() {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-function fmt(n) { 
+function fmt(n) {
   const val = prefMoneda === 'USD' ? (n / dolarHoy) : n;
-  return (prefMoneda === 'USD' ? 'U$D ' : '$') + parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); 
+  return (prefMoneda === 'USD' ? 'U$D ' : '$') + parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fdate(d) { return (d || '').split('-').reverse().join('/'); }
-function catColor(nombre) { 
+function catColor(nombre) {
   if (nombre === 'Deudas') return '#185FA5';
-  return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color; 
+  return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color;
 }
 const EMOJIS = { 'Supermercado': '🛒', 'Servicios': '💡', 'Transporte': '🚗', 'Salud': '💊', 'Educación': '📚', 'Entretenimiento': '🎬', 'Ropa': '👕', 'Deudas': '💳', 'Otros': '📦' };
 function catEmoji(n) { return EMOJIS[n] || '📦'; }
@@ -550,10 +532,10 @@ function fmtGasto(n, moneda) {
   let finalVal = n;
   if (moneda === 'USD' && prefMoneda === 'ARS') finalVal = n * dolarHoy;
   if (moneda === 'ARS' && prefMoneda === 'USD') finalVal = n / dolarHoy;
-  
+
   const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
   const res = symbol + parseFloat(finalVal || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  
+
   if (moneda !== prefMoneda) {
     const origSymbol = moneda === 'USD' ? 'U$D ' : '$';
     const orig = origSymbol + parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -567,20 +549,15 @@ const fmtDeuda = fmtGasto;
 // ─── TABS ────────────────────────────────────────────────────────────────────
 function switchTab(t) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const tabs = ['home', 'nuevo', 'hist', 'bal', 'goals', 'rep', 'deu', 'rec', 'met', 'cfg', 'mas'];
+  const tabs = ['home', 'nuevo', 'hist', 'bal', 'goals', 'rep', 'deu', 'rec', 'met', 'cfg'];
   document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', b.id === 'nb-' + t));
   document.getElementById('p-' + t).classList.add('active');
   document.getElementById('app-content').scrollTop = 0;
-  
+
   // Auto scroll navigation to keep active button visible
   const activeBtn = document.getElementById('nb-' + t);
   if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
-  // 👇 NUEVO: Si cambiamos a la pestaña "nuevo", limpiamos el estado de edición
-  if (t === 'nuevo') {
-    clearForm();  // Limpia el formulario y resetea editGastoId
-  }
-  
   if (t === 'home') renderDash();
   if (t === 'nuevo') initForm();
   if (t === 'hist') { initHist(); loadHistorial(); }
@@ -595,7 +572,7 @@ function switchTab(t) {
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 function renderDashDeudas() {
-  const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
+  const activas = allDeudas.filter(d => (d.cuotas_pagas || 0) < (d.cuotas_total || 1));
   if (activas.length === 0) {
     const el = document.getElementById('dash-deudas');
     if (el) el.style.display = 'none';
@@ -604,21 +581,21 @@ function renderDashDeudas() {
   const el = document.getElementById('dash-deudas');
   if (el) {
     el.style.display = 'block';
-    const tarjetas = ['Visa','Mastercard','Amex'];
+    const tarjetas = ['Visa', 'Mastercard', 'Amex'];
     const porTarjeta = {};
-    tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0 }; });
+    tarjetas.forEach(t => { porTarjeta[t] = { ars: 0, usd: 0 }; });
     activas.forEach(d => {
       if (porTarjeta[d.tarjeta]) {
-        if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
-        else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+        if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota || 0);
+        else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota || 0);
       }
     });
     el.innerHTML = '<div class="card-title">Cuotas este mes</div>' +
       tarjetas.filter(t => porTarjeta[t].ars > 0 || porTarjeta[t].usd > 0).map(t => {
         const color = TARJETA_COLORS[t];
         let montos = [];
-        if (porTarjeta[t].ars > 0) montos.push('$'+porTarjeta[t].ars.toLocaleString('es-AR',{minimumFractionDigits:2}));
-        if (porTarjeta[t].usd > 0) montos.push('U$D '+porTarjeta[t].usd.toLocaleString('es-AR',{minimumFractionDigits:2}));
+        if (porTarjeta[t].ars > 0) montos.push('$' + porTarjeta[t].ars.toLocaleString('es-AR', { minimumFractionDigits: 2 }));
+        if (porTarjeta[t].usd > 0) montos.push('U$D ' + porTarjeta[t].usd.toLocaleString('es-AR', { minimumFractionDigits: 2 }));
         return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
           <span class="tarjeta-badge" style="background:${color};color:white">${t}</span>
           <span style="font-size:13px;font-weight:600">${montos.join(' + ')}/mes</span>
@@ -628,7 +605,7 @@ function renderDashDeudas() {
   }
 }
 
-    function changeMonth(d) { dashMonth.setMonth(dashMonth.getMonth() + d); renderDash(); }
+function changeMonth(d) { dashMonth.setMonth(dashMonth.getMonth() + d); renderDash(); }
 
 function getMonthGastos() {
   const y = dashMonth.getFullYear(), m = String(dashMonth.getMonth() + 1).padStart(2, '0');
@@ -640,7 +617,7 @@ function renderDash() {
   renderDashDeudas();
   renderEvolutionChart();
   document.getElementById('dash-month').textContent = `${MESES[dashMonth.getMonth()]} ${dashMonth.getFullYear()}`;
-  
+
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
     return g.moneda === 'USD' ? m * dolarHoy : m;
@@ -697,21 +674,21 @@ function renderDash() {
   </div>
   `;
   const catMap = {};
-  mg.forEach(g => { 
+  mg.forEach(g => {
     const montoARS = getMontoARS(g);
-    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS;
   });
 
   const sorted = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
-  
+
   document.getElementById('dash-cats').innerHTML = sorted.length
     ? sorted.map(([cat, val]) => {
-        const cInfo = categorias.find(c => c.nombre === cat) || {};
-        const ppto = parseFloat(cInfo.presupuesto || 0);
-        const pct = ppto > 0 ? Math.round((val / ppto) * 100) : 0;
-        const barColor = (ppto > 0 && val > ppto) ? 'var(--red)' : catColor(cat);
-        
-        return `<div class="cat-row">
+      const cInfo = categorias.find(c => c.nombre === cat) || {};
+      const ppto = parseFloat(cInfo.presupuesto || 0);
+      const pct = ppto > 0 ? Math.round((val / ppto) * 100) : 0;
+      const barColor = (ppto > 0 && val > ppto) ? 'var(--red)' : catColor(cat);
+
+      return `<div class="cat-row">
         <div class="cat-row-head">
           <span class="cat-name"><span class="cat-dot" style="background:${catColor(cat)}"></span>${cat}</span>
           <span class="cat-val">${fmt(val)} ${ppto > 0 ? `<span style="color:var(--text3);font-size:11px;font-weight:400">/ ${fmt(ppto)}</span>` : ''}</span>
@@ -723,39 +700,6 @@ function renderDash() {
       </div>`;
     }).join('')
     : '<div class="empty"><div class="empty-icon">📊</div>Sin gastos en este mes</div>';
-
-  const ctxDonut = document.getElementById('donutChart');
-  if (ctxDonut) {
-    if (window.donutChartInstance) window.donutChartInstance.destroy();
-    
-    const labels = sorted.map(x => x[0]);
-    const data = sorted.map(x => x[1]);
-    const bgColors = labels.map(cat => catColor(cat));
-    
-    if (typeof Chart !== 'undefined') {
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        window.donutChartInstance = new Chart(ctxDonut, {
-          type: 'doughnut',
-          data: {
-            labels: labels,
-            datasets: [{
-              data: data,
-              backgroundColor: bgColors,
-              borderWidth: isDark ? 2 : 1,
-              borderColor: isDark ? '#1a1a18' : '#ffffff'
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false }
-            },
-            cutout: '70%'
-          }
-        });
-    }
-  }
 
   const recent = mg.slice(0, 5);
   document.getElementById('dash-recent').innerHTML = recent.length
@@ -775,75 +719,32 @@ function renderDash() {
 }
 
 // ─── NUEVO GASTO ─────────────────────────────────────────────────────────────
-// ─── FORM HANDLERS ───────────────────────────────────────────────────────────
-
-/**
- * Manejador de cambios en selects del formulario de gastos.
- * Esta función es un placeholder que permite a navegadores móviles procesar
- * correctamente el cambio de valor sin interferencias.
- */
-function handleSelectChange(selectElement) {
-  // No hacer nada - permite que el navegador procese el evento normalmente
-  // La presencia de este manejador es suficiente para estabilizar el comportamiento en mobile
-}
-
-/**
- * Configura los event listeners para el formulario de gastos.
- * En mobile, después de cambiar un select, hay casos donde el teclado se cierra
- * cuando el usuario intenta hacer click en el siguiente campo. Este setup previene eso.
- */
-function setupFormHandlers() {
-  const fDesc = document.getElementById('f-desc');
-  const fCat = document.getElementById('f-cat');
-  const fPersona = document.getElementById('f-persona');
-  
-  if (!fDesc || !fCat || !fPersona) return;
-  
-  // Prevenir que el navegador cierre el teclado de forma inesperada
-  // Restaurar focus al campo de descripción si se pierde demasiado rápido
-  let descLastBlurTime = 0;
-  fDesc.addEventListener('blur', (e) => {
-    const now = Date.now();
-    if (descLastBlurTime && now - descLastBlurTime < 200) {
-      // Si se perdió el focus muy rápidamente (menos de 200ms), probablemente fue
-      // por interferencia del navegador. Re-enfocar.
-      setTimeout(() => fDesc.focus(), 50);
-    }
-    descLastBlurTime = now;
-  }, true);
-  
-  // También prevenir blur cuando el select está activo
-  let selectWasJustChanged = false;
-  fCat.addEventListener('change', () => {
-    selectWasJustChanged = true;
-    setTimeout(() => { selectWasJustChanged = false; }, 300);
-  });
-  
-  fPersona.addEventListener('change', () => {
-    selectWasJustChanged = true;
-    setTimeout(() => { selectWasJustChanged = false; }, 300);
-  });
-}
+function initForm() {
   const now = new Date();
-  document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
-  
-  // Solo regenerar selects si están vacíos (primera vez)
-  const catSelect = document.getElementById('f-cat');
-  if (catSelect.options.length === 0) {
-    catSelect.innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-  }
-  
-  const personaSelect = document.getElementById('f-persona');
-  if (personaSelect.options.length === 0) {
-    personaSelect.innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
-  }
-  
-  document.getElementById('f-moneda').value = prefMoneda;
 
-  const currentProfile = usuarios.find(u => u.id === currentUser.id);
-  if (currentProfile) {
-    document.getElementById('f-persona').value = currentProfile.name;
+  // Fecha: solo si está vacía
+  const fFecha = document.getElementById('f-fecha');
+  if (fFecha && !fFecha.value) {
+    fFecha.value = now.toISOString().split('T')[0];
   }
+
+  // Categorías: solo si el select está vacío
+  const fcat = document.getElementById('f-cat');
+  if (fcat && fcat.options.length === 0) {
+    fcat.innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  }
+
+  // Personas: solo si el select está vacío
+  const fper = document.getElementById('f-persona');
+  if (fper && fper.options.length === 0) {
+    fper.innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+    const currentProfile = usuarios.find(u => u.id === currentUser.id);
+    if (currentProfile) fper.value = currentProfile.name;
+  }
+
+  // Moneda: solo si no tiene valor
+  const fMon = document.getElementById('f-moneda');
+  if (fMon && !fMon.value) fMon.value = prefMoneda;
 }
 
 const BTN_LABEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> Guardar gasto';
@@ -856,10 +757,10 @@ function resetSaveBtn() {
 async function saveGasto() {
   const fecha = document.getElementById('f-fecha').value;
   let montoRaw = document.getElementById('f-monto').value;
-  
+
   // Limpieza para móviles: comas por puntos y quitar basura
   montoRaw = montoRaw.replace(',', '.').replace(/[^0-9.]/g, '');
-  
+
   const monto = parseFloat(montoRaw);
   const moneda = document.getElementById('f-moneda').value;
   const cat = document.getElementById('f-cat').value;
@@ -881,39 +782,22 @@ async function saveGasto() {
     const montoFinal = Number(monto.toFixed(2));
     if (montoFinal > 99999999) { throw new Error('El monto es demasiado alto'); }
 
-    if (editGastoId) {
-      const gastoSB = { fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas };
-      const { error } = await updateGastoDB(editGastoId, gastoSB);
-      if (error) {
-        showToast('Error al actualizar: ' + error.message, 'err');
-      } else {
-        const index = allGastos.findIndex(g => g.id === editGastoId);
-        if (index > -1) {
-          allGastos[index] = { ...allGastos[index], ...gastoSB };
-        }
-        showToast('Gasto actualizado ✓');
-        clearForm();
-        renderDash();
-        switchTab('hist');
-      }
-    } else {
-      const id_temp = 'tmp_' + Date.now();
-      const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
-      allGastos.unshift(gasto);
+    const id_temp = 'tmp_' + Date.now();
+    const gasto = { id: id_temp, fecha, monto: montoFinal, moneda, categoria: cat, persona, descripcion: desc, notas, user_id: currentUser.id, user_email: currentUser.email };
+    allGastos.unshift(gasto);
+    renderDash();
+
+    const { id: _drop, ...gastoSB } = gasto;
+    const { error } = await saveGastoToDB(gastoSB);
+
+    if (error) {
+      allGastos = allGastos.filter(g => g.id !== id_temp);
       renderDash();
-
-      const { id: _drop, ...gastoSB } = gasto;
-      const { error } = await saveGastoToDB(gastoSB);
-
-      if (error) {
-        allGastos = allGastos.filter(g => g.id !== id_temp);
-        renderDash();
-        showToast('Error: ' + error.message, 'err');
-      } else {
-        showToast('Gasto guardado ✓');
-        clearForm();
-        document.getElementById('f-monto').focus();
-      }
+      showToast('Error: ' + error.message, 'err');
+    } else {
+      showToast('Gasto guardado ✓');
+      clearForm();
+      document.getElementById('f-monto').focus();
     }
   } catch (e) {
     showToast(e.message || 'Error inesperado', 'err');
@@ -926,66 +810,6 @@ function clearForm() {
   document.getElementById('f-monto').value = '';
   document.getElementById('f-desc').value = '';
   document.getElementById('f-notas').value = '';
-  editGastoId = null;
-  const btn = document.getElementById('save-btn');
-  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12" /></svg> Guardar gasto`;
-}
-
-//function editarGasto(id) {
-//  const g = allGastos.find(x => x.id === id);
-//  if (!g) return;
-//  
-//  switchTab('nuevo'); // Se llama primero para que initForm() genere los combos y defaults
-//  
-//  editGastoId = id;
-//  document.getElementById('f-fecha').value = g.fecha || '';
-//  document.getElementById('f-monto').value = g.monto || '';
-//  document.getElementById('f-moneda').value = g.moneda || 'ARS';
-//  document.getElementById('f-cat').value = g.categoria || '';
-//  document.getElementById('f-persona').value = g.persona || '';
-//  document.getElementById('f-desc').value = g.descripcion || '';
-//  document.getElementById('f-notas').value = g.notas || '';
-//  
-//  const btn = document.getElementById('save-btn');
-//  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Actualizar gasto`;
-//}
-
-// Reemplazá la función editarGasto completa con esta versión:
-
-function editarGasto(id) {
-  const g = allGastos.find(x => x.id === id);
-  if (!g) return;
-  
-  // Primero cambiamos de pestaña (esto NO debe ejecutar initForm automáticamente)
-  // En lugar de switchTab que llama a initForm, cambiamos manualmente
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('p-nuevo').classList.add('active');
-  document.getElementById('nb-nuevo').classList.add('active');
-  document.getElementById('app-content').scrollTop = 0;
-  
-  // Ahora sí, asignamos los valores del gasto a los campos (sin initForm de por medio)
-  document.getElementById('f-fecha').value = g.fecha || '';
-  document.getElementById('f-monto').value = g.monto || '';
-  document.getElementById('f-moneda').value = g.moneda || 'ARS';
-  
-  // Asegurar que los selects tengan opciones cargadas (si no lo están)
-  if (document.getElementById('f-cat').options.length === 0) {
-    document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-  }
-  if (document.getElementById('f-persona').options.length === 0) {
-    document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
-  }
-  
-  document.getElementById('f-cat').value = g.categoria || '';
-  document.getElementById('f-persona').value = g.persona || '';
-  document.getElementById('f-desc').value = g.descripcion || '';
-  document.getElementById('f-notas').value = g.notas || '';
-  
-  editGastoId = id;
-  
-  const btn = document.getElementById('save-btn');
-  if(btn) btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg> Actualizar gasto`;
 }
 
 // ─── HISTORIAL ───────────────────────────────────────────────────────────────
@@ -998,27 +822,26 @@ function toggleMs(id, event) {
   if (event) event.stopPropagation();
   const el = document.getElementById(id);
   const isOpen = el.style.display !== 'none';
-  
+
   // Cerramos otros dropdowns
   document.querySelectorAll('.ms-dropdown').forEach(d => {
     if (d.id !== id) d.style.display = 'none';
   });
-  
+
   el.style.display = isOpen ? 'none' : 'block';
 }
 
 // Listener global optimizado para evitar cierres de teclado en móviles
 document.addEventListener('click', e => {
-  if (!e.target.closest('.ms-wrap')) {
-    const drops = document.querySelectorAll('.ms-dropdown');
-    let anyOpen = false;
-    drops.forEach(d => { if(d.style.display !== 'none') anyOpen = true; });
-    
-    if (anyOpen) {
-      drops.forEach(d => {
-        if (d.style.display !== 'none') d.style.display = 'none';
-      });
-    }
+  // Ignorar clicks dentro de selects o multiselects para no interrumpir el foco
+  if (e.target.closest('select') || e.target.closest('.ms-wrap') || e.target.closest('.ms-dropdown')) return;
+
+  const drops = document.querySelectorAll('.ms-dropdown');
+  let anyOpen = false;
+  drops.forEach(d => { if (d.style.display !== 'none') anyOpen = true; });
+
+  if (anyOpen) {
+    drops.forEach(d => { if (d.style.display !== 'none') d.style.display = 'none'; });
   }
 });
 
@@ -1096,17 +919,13 @@ function initHist() {
 function loadHistorial() {
   document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
   const mes = document.getElementById('h-mes').value;
-  const busq = document.getElementById('h-busq')?.value.toLowerCase().trim();
   let f = allGastos;
   if (mes) f = f.filter(g => g.fecha && g.fecha.startsWith(mes));
   if (msCatSel.size > 0) f = f.filter(g => msCatSel.has(g.categoria));
   if (msPerSel.size > 0) f = f.filter(g => msPerSel.has(g.persona));
-  if (busq) {
-    f = f.filter(g => (g.descripcion || '').toLowerCase().includes(busq) || (g.notas || '').toLowerCase().includes(busq));
-  }
   // La lista ya viene ordenada de la DB por fecha y created_at
   f = f.slice();
-  
+
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
     return g.moneda === 'USD' ? m * dolarHoy : m;
@@ -1125,10 +944,7 @@ function loadHistorial() {
     <div class="tx-right">
       <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
       <div class="tx-date">${fdate(g.fecha)}</div>
-      <div style="display:flex;gap:4px;justify-content:flex-end">
-        <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
-      </div>
+      <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
     </div>
 
   </div>`).join('')
@@ -1157,28 +973,28 @@ function getReporteData() {
     const mes = document.getElementById('r-mes').value;
     if (!mes) { showToast('Seleccioná un mes', 'err'); return null; }
     const [y, m] = mes.split('-');
-    return { 
+    return {
       list: allGastos
         .filter(g => g.fecha && g.fecha.startsWith(mes))
         .sort((a, b) => {
           const dateComp = b.fecha.localeCompare(a.fecha);
           if (dateComp !== 0) return dateComp;
           return a.categoria.localeCompare(b.categoria);
-        }), 
-      label: `${MESES[parseInt(m) - 1]} ${y}` 
+        }),
+      label: `${MESES[parseInt(m) - 1]} ${y}`
     };
   } else {
     const desde = document.getElementById('r-desde').value, hasta = document.getElementById('r-hasta').value;
     if (!desde || !hasta) { showToast('Seleccioná fechas', 'err'); return null; }
-    return { 
+    return {
       list: allGastos
         .filter(g => g.fecha >= desde && g.fecha <= hasta)
         .sort((a, b) => {
           const dateComp = b.fecha.localeCompare(a.fecha);
           if (dateComp !== 0) return dateComp;
           return a.categoria.localeCompare(b.categoria);
-        }), 
-      label: `${fdate(desde)} al ${fdate(hasta)}` 
+        }),
+      label: `${fdate(desde)} al ${fdate(hasta)}`
     };
   }
 }
@@ -1188,7 +1004,7 @@ function previewReporte() {
   const { list, label } = r;
   const div = document.getElementById('rep-preview');
   if (!list.length) { div.innerHTML = '<div class="empty">Sin datos para el período</div>'; return; }
-  
+
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
     return g.moneda === 'USD' ? m * dolarHoy : m;
@@ -1196,9 +1012,9 @@ function previewReporte() {
 
   const total = list.reduce((s, g) => s + getMontoARS(g), 0);
   const catMap = {};
-  list.forEach(g => { 
+  list.forEach(g => {
     const montoARS = getMontoARS(g);
-    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS;
   });
   div.innerHTML = `<div class="rep-total"><span>${label} · ${list.length} gastos</span><span>${fmt(total)}</span></div>` +
     Object.entries(catMap).sort((a, b) => b[1] - a[1]).map(([c, v]) => `
@@ -1219,76 +1035,34 @@ function exportarExcel() {
   if (!list.length) { showToast('Sin datos', 'err'); return; }
   const wb = XLSX.utils.book_new();
   const data = [['Fecha', 'Descripción', 'Categoría', 'Persona', `Monto (${prefMoneda})`, 'Notas', 'Moneda Original', 'Monto Original']];
-  
+
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
     return g.moneda === 'USD' ? m * dolarHoy : m;
   };
 
   list.forEach(g => {
-    const montoConsolidadoRaw = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
-    const montoConsolidado = prefMoneda === 'USD' ? Number(montoConsolidadoRaw.toFixed(2)) : montoConsolidadoRaw;
+    const montoConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
     data.push([
-      fdate(g.fecha), 
-      g.descripcion || '', 
-      g.categoria, 
-      g.persona, 
-      montoConsolidado, 
-      g.notas || '', 
-      g.moneda || 'ARS', 
+      fdate(g.fecha),
+      g.descripcion || '',
+      g.categoria,
+      g.persona,
+      montoConsolidado,
+      g.notas || '',
+      g.moneda || 'ARS',
       parseFloat(g.monto)
     ]);
   });
 
   const totalARS = list.reduce((s, g) => s + getMontoARS(g), 0);
-  const totalConsolidadoRaw = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
-  const totalConsolidado = prefMoneda === 'USD' ? Number(totalConsolidadoRaw.toFixed(2)) : totalConsolidadoRaw;
-  
+  const totalConsolidado = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+
   data.push(['', '', '', 'TOTAL CONSOLIDADO', totalConsolidado, '', prefMoneda, '']);
-  
+
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 18 }, { wch: 12 }, { wch: 16 }, { wch: 25 }, { wch: 15 }, { wch: 15 }];
   XLSX.utils.book_append_sheet(wb, ws, 'Gastos');
-
-  // --- NUEVA SOLAPA: POR CATEGORÍA ---
-  const resumenData = [['Categoría', 'Fecha', 'Descripción', `Monto (${prefMoneda})`]];
-  
-  const listSorted = [...list].sort((a, b) => {
-    if (a.categoria < b.categoria) return -1;
-    if (a.categoria > b.categoria) return 1;
-    return (a.fecha || '').localeCompare(b.fecha || '');
-  });
-
-  let currentCat = null;
-  let subtotalCat = 0;
-
-  listSorted.forEach(g => {
-    const montoRaw = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
-    const monto = prefMoneda === 'USD' ? Number(montoRaw.toFixed(2)) : montoRaw;
-    if (currentCat !== g.categoria) {
-      if (currentCat !== null) {
-        resumenData.push(['', '', 'SUBTOTAL ' + currentCat.toUpperCase(), prefMoneda === 'USD' ? Number(subtotalCat.toFixed(2)) : subtotalCat]);
-        resumenData.push([]); // Espacio visual
-      }
-      currentCat = g.categoria;
-      subtotalCat = 0;
-    }
-    subtotalCat += monto;
-    resumenData.push([g.categoria, fdate(g.fecha), g.descripcion || '', monto]);
-  });
-
-  if (currentCat !== null) {
-    resumenData.push(['', '', 'SUBTOTAL ' + currentCat.toUpperCase(), prefMoneda === 'USD' ? Number(subtotalCat.toFixed(2)) : subtotalCat]);
-  }
-  
-  resumenData.push([]);
-  resumenData.push(['', '', 'TOTAL GENERAL', totalConsolidado]);
-  
-  const wsResumen = XLSX.utils.aoa_to_sheet(resumenData);
-  wsResumen['!cols'] = [{ wch: 18 }, { wch: 12 }, { wch: 30 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(wb, wsResumen, 'Por Categoría');
-  // ------------------------------------
-
   XLSX.writeFile(wb, `Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.xlsx`);
   showToast('Excel exportado ✓');
 }
@@ -1311,22 +1085,20 @@ function exportarPDF() {
 
   const totalARS = list.reduce((s, g) => s + getMontoARS(g), 0);
   const catMap = {};
-  list.forEach(g => { 
+  list.forEach(g => {
     const montoARS = getMontoARS(g);
-    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
+    catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS;
   });
 
   doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('Resumen por categoría', 14, 38);
   let y = 45;
   Object.entries(catMap).sort((a, b) => b[1] - a[1]).forEach(([c, v]) => {
     doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-    const vConsolidado = prefMoneda === 'USD' ? (v / dolarHoy) : v;
-    doc.text(`${c}: ${prefMoneda === 'USD' ? 'U$D ' : '$'} ${vConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 18, y); y += 6;
+    doc.text(`${c}: ${fmt(v)}`, 18, y); y += 6;
   });
 
   y += 4; doc.setFont('helvetica', 'bold');
-  const tConsolidado = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
-  doc.text(`TOTAL GENERAL: ${prefMoneda === 'USD' ? 'U$D ' : '$'} ${tConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, y); y += 10;
+  doc.text(`TOTAL GENERAL: ${fmt(totalARS)}`, 14, y); y += 10;
 
   doc.autoTable({
     head: [['Fecha', 'Descripción', 'Categoría', 'Persona', `Monto (${prefMoneda})`]],
@@ -1334,11 +1106,11 @@ function exportarPDF() {
       const mConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
       const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
       return [
-        fdate(g.fecha), 
-        g.descripcion || '', 
-        g.categoria, 
-        g.persona, 
-        symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        fdate(g.fecha),
+        g.descripcion || '',
+        g.categoria,
+        g.persona,
+        symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2 })
       ];
     }),
     startY: y, styles: { fontSize: 9 }, headStyles: { fillColor: [26, 26, 24] },
@@ -1378,7 +1150,7 @@ async function addCategoria() {
   const color = document.getElementById('new-cat-color').value;
   if (!nombre) { showToast('Escribí el nombre', 'err'); return; }
   if (categorias.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) { showToast('Ya existe esa categoría', 'err'); return; }
-  
+
   try {
     const { data, error } = await sbWithTimeout(() => sb.from('categorias').insert([{ nombre, color, presupuesto }]).select());
     if (error) throw error;
@@ -1459,9 +1231,9 @@ async function updateCategoriaPpto(id, ppto) {
 
 // ─── DEUDAS ──────────────────────────────────────────────────────────────────
 let allDeudas = [];
-const TARJETA_COLORS = { Visa:'#1a1f71', Mastercard:'#eb001b', Amex:'#2e77bc' };
-const TARJETA_EMOJIS = { Visa:'💳', Mastercard:'💳', Amex:'💎' };
-const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const TARJETA_COLORS = { Visa: '#1a1f71', Mastercard: '#eb001b', Amex: '#2e77bc' };
+const TARJETA_EMOJIS = { Visa: '💳', Mastercard: '💳', Amex: '💎' };
+const MESES_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
 async function loadDeudas() {
   const { data, error } = await sb.from('deudas').select('*').order('created_at', { ascending: false });
@@ -1470,8 +1242,8 @@ async function loadDeudas() {
 
 function showFormDeuda() {
   const now = new Date();
-  document.getElementById('d-inicio').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  
+  document.getElementById('d-inicio').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
   document.getElementById('d-moneda').value = prefMoneda;
 
   // Ordenar: primero el usuario logueado, luego los demás
@@ -1482,12 +1254,12 @@ function showFormDeuda() {
     `<option value="${u.name}">${u.name}${i === 0 ? ' (yo)' : ''}</option>`
   ).join('');
   document.getElementById('deu-form').style.display = 'block';
-  document.getElementById('deu-form').scrollIntoView({ behavior:'smooth' });
+  document.getElementById('deu-form').scrollIntoView({ behavior: 'smooth' });
 }
 
 function hideFormDeuda() {
   document.getElementById('deu-form').style.display = 'none';
-  ['d-desc','d-monto','d-cuotas','d-notas'].forEach(id => document.getElementById(id).value = '');
+  ['d-desc', 'd-monto', 'd-cuotas', 'd-notas'].forEach(id => document.getElementById(id).value = '');
 }
 
 async function saveDeuda() {
@@ -1506,21 +1278,23 @@ async function saveDeuda() {
   if (!inicio) { showToast('Seleccioná el mes de inicio', 'err'); return; }
   const btn = document.getElementById('d-save-btn');
   btn.innerHTML = '<span class="spinner"></span> Guardando...'; btn.classList.add('btn-loading');
-  const deuda = { descripcion:desc, monto_total:monto, moneda, cuotas_total:cuotas,
-    cuotas_pagas:0, mes_inicio:inicio, tarjeta, persona, notas,
-    monto_cuota: Math.round(monto/cuotas*100)/100,
-    user_id: currentUser.id, user_email: currentUser.email };
-  
+  const deuda = {
+    descripcion: desc, monto_total: monto, moneda, cuotas_total: cuotas,
+    cuotas_pagas: 0, mes_inicio: inicio, tarjeta, persona, notas,
+    monto_cuota: Math.round(monto / cuotas * 100) / 100,
+    user_id: currentUser.id, user_email: currentUser.email
+  };
+
   try {
     const { error } = await sbWithTimeout(() => sb.from('deudas').insert([deuda]));
     if (error) throw error;
-    
-    allDeudas.unshift({...deuda, id: Date.now()});
+
+    allDeudas.unshift({ ...deuda, id: Date.now() });
     hideFormDeuda();
     renderDeudas();
     renderDash();
     showToast('Deuda guardada ✓');
-  } catch(e) {
+  } catch (e) {
     showToast('Error: ' + e.message, 'err');
   } finally {
     btn.innerHTML = 'Guardar';
@@ -1551,7 +1325,7 @@ function cerrarModalPago() {
 async function pagarCuota(id) {
   const d = allDeudas.find(x => x.id === id);
   if (!d) return;
-  
+
   deudaEnPago = d;
   document.getElementById('m-pago-desc').textContent = d.descripcion;
   document.getElementById('m-fecha-pago').value = new Date().toISOString().split('T')[0];
@@ -1567,14 +1341,14 @@ async function confirmarPagoCuota() {
   cerrarModalPago();
 
   const nuevasPagas = (d.cuotas_pagas || 0) + 1;
-  
+
   showToast('Procesando pago...', 'info');
-  
+
   try {
     // 1. Actualizar la deuda
     const { error: errorDeuda } = await sbWithTimeout(() => sb.from('deudas').update({ cuotas_pagas: nuevasPagas }).eq('id', d.id));
     if (errorDeuda) throw errorDeuda;
-    
+
     // 2. Crear un gasto automático para que se vea en el dashboard
     const gasto = {
       fecha: fechaPago,
@@ -1587,9 +1361,9 @@ async function confirmarPagoCuota() {
       user_id: currentUser.id,
       user_email: currentUser.email
     };
-    
+
     const { error: errorGasto } = await sbWithTimeout(() => sb.from('gastos').insert([gasto]));
-    
+
     if (errorGasto) {
       showToast('Cuota marcada, pero no se pudo crear el gasto', 'warn');
     } else {
@@ -1610,15 +1384,15 @@ function getCuotasMes(yearMonth) {
   return allDeudas.reduce((total, d) => {
     if (!d.mes_inicio) return total;
     const [y, m] = d.mes_inicio.split('-').map(Number);
-    const inicio = new Date(y, m-1, 1);
+    const inicio = new Date(y, m - 1, 1);
     const [ty, tm] = yearMonth.split('-').map(Number);
-    const target = new Date(ty, tm-1, 1);
-    
+    const target = new Date(ty, tm - 1, 1);
+
     // Diferencia en meses
     const diffMonths = (target.getFullYear() - inicio.getFullYear()) * 12 + (target.getMonth() - inicio.getMonth());
-    
+
     const cuotasTotal = d.cuotas_total || 1;
-    
+
     if (diffMonths >= 0 && diffMonths < cuotasTotal) {
       // Solo sumamos si esta cuota aún no fue pagada
       // diffMonths es el índice de la cuota (0 para el primer mes)
@@ -1637,12 +1411,12 @@ function getCuotasMes(yearMonth) {
 function getProxVencimiento(tarjeta) {
   const cfg = tarjetasCfg.find(t => t.tarjeta === tarjeta);
   if (!cfg) return { label: 'Sin config', color: 'var(--text3)' };
-  
+
   const hoy = new Date();
   const dia = hoy.getDate();
   const mes = hoy.getMonth();
   const anio = hoy.getFullYear();
-  
+
   // Si hoy es antes o el mismo día del cierre, el resumen cierra este mes
   // Si es después, ya estamos consumiendo para el próximo mes
   let fechaCierre;
@@ -1651,29 +1425,29 @@ function getProxVencimiento(tarjeta) {
   } else {
     fechaCierre = new Date(anio, mes + 1, cfg.dia_cierre);
   }
-  
+
   const diffMs = fechaCierre - hoy;
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) return { label: 'CIERRA HOY', color: 'var(--red)' };
   if (diffDays <= 3) return { label: `Cierra en ${diffDays}d`, color: 'var(--red)' };
   return { label: `Cierra en ${diffDays}d`, color: 'var(--green)' };
 }
 
 function renderDeudas() {
-  const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
-  const terminadas = allDeudas.filter(d => (d.cuotas_pagas||0) >= (d.cuotas_total||1));
+  const activas = allDeudas.filter(d => (d.cuotas_pagas || 0) < (d.cuotas_total || 1));
+  const terminadas = allDeudas.filter(d => (d.cuotas_pagas || 0) >= (d.cuotas_total || 1));
 
   // ── Resumen por tarjeta ──
-  const tarjetas = ['Visa','Mastercard','Amex'];
+  const tarjetas = ['Visa', 'Mastercard', 'Amex'];
   const resDiv = document.getElementById('deu-resumen');
   const porTarjeta = {};
-  tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0, count:0 }; });
+  tarjetas.forEach(t => { porTarjeta[t] = { ars: 0, usd: 0, count: 0 }; });
   activas.forEach(d => {
     if (porTarjeta[d.tarjeta]) {
       porTarjeta[d.tarjeta].count++;
-      if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
-      else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+      if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota || 0);
+      else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota || 0);
     }
   });
   const tarjetasConDeuda = tarjetas.filter(t => porTarjeta[t].count > 0);
@@ -1685,12 +1459,12 @@ function renderDeudas() {
         const info = porTarjeta[t];
         const color = TARJETA_COLORS[t];
         let montos = [];
-        if (info.ars > 0) montos.push('<strong>$'+info.ars.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
-        if (info.usd > 0) montos.push('<strong>U$D '+info.usd.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
+        if (info.ars > 0) montos.push('<strong>$' + info.ars.toLocaleString('es-AR', { minimumFractionDigits: 2 }) + '</strong>');
+        if (info.usd > 0) montos.push('<strong>U$D ' + info.usd.toLocaleString('es-AR', { minimumFractionDigits: 2 }) + '</strong>');
         return `<div class="resumen-tarjeta">
           <span style="display:flex;align-items:center;gap:8px">
             <span class="tarjeta-badge" style="background:${color};color:white">${t}</span>
-            <span style="font-size:12px;color:var(--text2)">${info.count} compra${info.count>1?'s':''}</span>
+            <span style="font-size:12px;color:var(--text2)">${info.count} compra${info.count > 1 ? 's' : ''}</span>
           </span>
           <span style="font-size:14px">${montos.join(' + ')}/mes</span>
         </div>`;
@@ -1704,8 +1478,8 @@ function renderDeudas() {
     const now = new Date();
     const mesesData = [];
     for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
-      const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const total = getCuotasMes(ym);
       mesesData.push({ label: MESES_SHORT[d.getMonth()], ym, total });
     }
@@ -1714,8 +1488,8 @@ function renderDeudas() {
       '<div class="bar-chart">' +
       mesesData.map(m => `
         <div class="bar-col">
-          <div class="bar-col-val">${m.total > 0 ? '$'+Math.round(m.total/1000)+'k' : ''}</div>
-          <div class="bar-col-bar" style="height:${Math.max(m.total/maxVal*100,2)}px;background:${m.total>0?'var(--blue)':'var(--border)'}"></div>
+          <div class="bar-col-val">${m.total > 0 ? '$' + Math.round(m.total / 1000) + 'k' : ''}</div>
+          <div class="bar-col-bar" style="height:${Math.max(m.total / maxVal * 100, 2)}px;background:${m.total > 0 ? 'var(--blue)' : 'var(--border)'}"></div>
           <div class="bar-col-lbl">${m.label}</div>
         </div>`).join('') +
       '</div>';
@@ -1732,16 +1506,16 @@ function renderDeudas() {
   lista.innerHTML = [...activas, ...terminadas].map(d => {
     const pagas = d.cuotas_pagas || 0;
     const total = d.cuotas_total || 1;
-    const pct = Math.round(pagas/total*100);
+    const pct = Math.round(pagas / total * 100);
     const terminada = pagas >= total;
     const color = TARJETA_COLORS[d.tarjeta] || '#888';
-    const [y,m] = (d.mes_inicio||'').split('-');
-    const inicioLabel = m && y ? `${MESES_SHORT[parseInt(m)-1]} ${y}` : '';
+    const [y, m] = (d.mes_inicio || '').split('-');
+    const inicioLabel = m && y ? `${MESES_SHORT[parseInt(m) - 1]} ${y}` : '';
     const venc = getProxVencimiento(d.tarjeta);
-    return `<div class="deu-item" style="${terminada?'opacity:0.5':''}">
+    return `<div class="deu-item" style="${terminada ? 'opacity:0.5' : ''}">
       <div class="deu-ico" style="background:${color}22">💳</div>
       <div class="deu-info">
-        <div class="deu-desc">${d.descripcion||''}</div>
+        <div class="deu-desc">${d.descripcion || ''}</div>
         <div class="deu-meta">
           <span class="tarjeta-badge" style="background:${color};color:white">${d.tarjeta}</span>
           · <span style="color:${venc.color};font-weight:700;font-size:10px">${venc.label}</span>
@@ -1770,7 +1544,7 @@ let msMetCatSel = new Set();
 function renderEvolutionChart() {
   const ctx = document.getElementById('evolutionChart');
   if (!ctx) return;
-  
+
   const data = [];
   const now = new Date();
   for (let i = 11; i >= 0; i--) {
@@ -1792,14 +1566,14 @@ function renderEvolutionChart() {
 function renderMetrics() {
   const ctx = document.getElementById('metEvolutionChart');
   if (!ctx) return;
-  
+
   buildMsMetCat();
-  
+
   const catsToShow = msMetCatSel.size > 0 ? Array.from(msMetCatSel) : categorias.map(c => c.nombre);
   const datasets = getEvolutionDataByCategory(catsToShow, 3);
-  
+
   if (metEvoChart) metEvoChart.destroy();
-  
+
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const textColor = isDark ? '#9b9896' : '#6b6966';
@@ -1826,34 +1600,34 @@ function renderMetrics() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { 
-        legend: { 
-          display: true, 
+      plugins: {
+        legend: {
+          display: true,
           position: 'top',
           labels: { color: textColor, font: { size: 10 }, boxWidth: 10 }
-        }, 
-        tooltip: { 
-          mode: 'index', 
+        },
+        tooltip: {
+          mode: 'index',
           intersect: false,
           callbacks: {
-            label: function(ctx) {
+            label: function (ctx) {
               const isProj = ctx.dataIndex === (ctx.dataset.data.length - 1);
               return ctx.dataset.label + ': ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR') + (isProj ? ' (Proj)' : '');
             }
           }
-        } 
+        }
       },
       scales: {
-        y: { 
-          display: true, 
+        y: {
+          display: true,
           beginAtZero: true,
           grid: { color: gridColor },
-          ticks: { 
-            color: textColor, 
+          ticks: {
+            color: textColor,
             font: { size: 9 },
-            callback: function(val) {
-              if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
-              if (val >= 1000) return (val/1000).toFixed(0) + 'k';
+            callback: function (val) {
+              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+              if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
               return val;
             }
           }
@@ -1862,7 +1636,7 @@ function renderMetrics() {
       }
     }
   });
-  
+
   renderMetricsStats();
 }
 
@@ -1902,7 +1676,7 @@ function getEvolutionDataByCategory(cats, months) {
   const datasets = [];
   const now = new Date();
   const labels = [];
-  
+
   // Etiquetas: meses anteriores + proyección
   for (let i = months; i >= 1; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -1917,7 +1691,7 @@ function getEvolutionDataByCategory(cats, months) {
   cats.forEach(catName => {
     const values = [];
     const cInfo = categorias.find(c => c.nombre === catName) || { color: '#888' };
-    
+
     // Valores reales
     for (let i = 0; i < labels.length - 1; i++) {
       const ym = labels[i];
@@ -1930,12 +1704,12 @@ function getEvolutionDataByCategory(cats, months) {
         }, 0);
       values.push(total);
     }
-    
+
     // Proyección: promedio de los últimos X meses (incluyendo el actual que puede estar incompleto, o solo los anteriores?)
     // Vamos a usar el promedio de los meses reales mostrados
     const avg = values.reduce((s, v) => s + v, 0) / (values.length);
     values.push(avg);
-    
+
     datasets.push({
       label: catName,
       labels: labels,
@@ -1943,13 +1717,13 @@ function getEvolutionDataByCategory(cats, months) {
       color: cInfo.color
     });
   });
-  
+
   return datasets;
 }
 
 function drawLineChart(ctx, chartInstance, datasets) {
   if (chartInstance) chartInstance.destroy();
-  
+
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const textColor = isDark ? '#9b9896' : '#6b6966';
@@ -1974,29 +1748,29 @@ function drawLineChart(ctx, chartInstance, datasets) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { 
-        legend: { display: datasets.length > 1, labels: { color: textColor } }, 
-        tooltip: { 
-          mode: 'index', 
+      plugins: {
+        legend: { display: datasets.length > 1, labels: { color: textColor } },
+        tooltip: {
+          mode: 'index',
           intersect: false,
           callbacks: {
-            label: function(ctx) {
+            label: function (ctx) {
               return ctx.dataset.label + ': ' + (prefMoneda === 'USD' ? 'U$D ' : '$') + ctx.parsed.y.toLocaleString('es-AR');
             }
           }
-        } 
+        }
       },
       scales: {
-        y: { 
-          display: true, 
+        y: {
+          display: true,
           beginAtZero: true,
           grid: { color: gridColor },
-          ticks: { 
-            color: textColor, 
+          ticks: {
+            color: textColor,
             font: { size: 9 },
-            callback: function(val) {
-              if (val >= 1000000) return (val/1000000).toFixed(1) + 'M';
-              if (val >= 1000) return (val/1000).toFixed(0) + 'k';
+            callback: function (val) {
+              if (val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+              if (val >= 1000) return (val / 1000).toFixed(0) + 'k';
               return val;
             }
           }
@@ -2010,7 +1784,7 @@ function drawLineChart(ctx, chartInstance, datasets) {
 function renderMetricsStats() {
   const now = new Date();
   const ymCurrent = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  
+
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const ymPrev = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
 
@@ -2024,11 +1798,11 @@ function renderMetricsStats() {
   const totalCurrent = allGastos
     .filter(g => g.fecha && g.fecha.startsWith(ymCurrent) && filterByCat(g))
     .reduce((s, g) => s + getMontoARS(g), 0);
-    
+
   const totalPrev = allGastos
     .filter(g => g.fecha && g.fecha.startsWith(ymPrev) && filterByCat(g))
     .reduce((s, g) => s + getMontoARS(g), 0);
-  
+
   const diff = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev * 100) : 0;
   const diffText = totalPrev > 0 ? `${diff > 0 ? '+' : ''}${diff.toFixed(1)}% vs mes ant.` : 'N/A';
   const diffColor = diff > 0 ? 'var(--red)' : 'var(--green)';
@@ -2068,7 +1842,7 @@ function renderMetricsStats() {
     <div class="cat-row">
       <div class="cat-row-head">
         <span class="cat-name"><span class="cat-dot" style="background:${catColor(cat)}"></span>${cat}</span>
-        <span class="cat-val">${fmt(val/3)}/mes</span>
+        <span class="cat-val">${fmt(val / 3)}/mes</span>
       </div>
       <div class="bar-bg">
         <div class="bar-fill" style="width:${(val / (top[0][1] || 1) * 100)}%;background:${catColor(cat)}"></div>
@@ -2104,10 +1878,10 @@ function renderRecurrentes() {
         <div class="rec-meta">${r.categoria} · ${personaBadge(r.persona)} · <strong>${r.moneda === 'USD' ? 'U$D ' : '$'}${parseFloat(r.monto).toLocaleString('es-AR')}</strong></div>
       </div>
       <div class="rec-actions">
-        ${yaCargado 
-          ? '<span style="color:var(--green);font-size:12px;font-weight:700;margin-right:8px">Cargado ✓</span>'
-          : `<button class="btn btn-primary btn-sm" onclick="cargarGastoRecurrente('${r.id}')">Cargar</button>`
-        }
+        ${yaCargado
+        ? '<span style="color:var(--green);font-size:12px;font-weight:700;margin-right:8px">Cargado ✓</span>'
+        : `<button class="btn btn-primary btn-sm" onclick="cargarGastoRecurrente('${r.id}')">Cargar</button>`
+      }
         <button class="btn btn-danger btn-sm" onclick="deleteRecurrente('${r.id}')">🗑</button>
       </div>
     </div>`;
@@ -2118,7 +1892,7 @@ function showFormRec() {
   document.getElementById('rf-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
   document.getElementById('rf-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
   document.getElementById('rf-moneda').value = prefMoneda;
-  
+
   // Federico por defecto
   const personaSelect = document.getElementById('rf-persona');
   const currentProfile = usuarios.find(u => u.id === currentUser.id);
@@ -2148,7 +1922,7 @@ async function saveRecurrente() {
   btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
 
   const item = { descripcion: desc, monto, categoria: cat, persona, moneda, user_id: currentUser.id, user_email: currentUser.email };
-  
+
   try {
     const { data, error } = await sbWithTimeout(() => sb.from('recurrentes').insert([item]).select());
     if (error) throw error;
@@ -2182,17 +1956,17 @@ async function cargarGastoRecurrente(id) {
 
   const hoy = new Date();
   const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
-  
-  const gasto = { 
-    fecha, 
-    monto: r.monto, 
-    categoria: r.categoria, 
-    persona: r.persona, 
-    descripcion: r.descripcion, 
+
+  const gasto = {
+    fecha,
+    monto: r.monto,
+    categoria: r.categoria,
+    persona: r.persona,
+    descripcion: r.descripcion,
     moneda: r.moneda || 'ARS',
     notas: 'Carga automática (Fijo)',
-    user_id: currentUser.id, 
-    user_email: currentUser.email 
+    user_id: currentUser.id,
+    user_email: currentUser.email
   };
 
   showToast('Cargando...', 'info');
@@ -2221,9 +1995,9 @@ async function cargarTodosRecurrentes() {
   const fecha = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
   const nuevos = pendientes.map(r => ({
-    fecha, monto: r.monto, categoria: r.categoria, persona: r.persona, 
+    fecha, monto: r.monto, categoria: r.categoria, persona: r.persona,
     descripcion: r.descripcion, moneda: r.moneda || 'ARS',
-    notas: 'Carga automática masiva', user_id: currentUser.id, user_email: currentUser.email 
+    notas: 'Carga automática masiva', user_id: currentUser.id, user_email: currentUser.email
   }));
 
   try {
@@ -2249,17 +2023,33 @@ async function loadIngresos() {
 
 function showFormIngreso() {
   document.getElementById('bal-form').style.display = 'block';
-  // Limpiar todos los campos del formulario
-  document.getElementById('i-desc').value = '';
-  document.getElementById('i-monto').value = '';
-  document.getElementById('i-fecha').value = new Date().toISOString().split('T')[0];
-  document.getElementById('i-moneda').value = prefMoneda;
-  // Enfocar en el primer campo para facilitar el input
-  document.getElementById('i-desc').focus();
+  // Limpiar campos para evitar valores previos
+  const elDesc = document.getElementById('i-desc');
+  const elMonto = document.getElementById('i-monto');
+  const elFecha = document.getElementById('i-fecha');
+  const elMon = document.getElementById('i-moneda');
+  if (elDesc) elDesc.value = '';
+  if (elMonto) elMonto.value = '';
+  if (elFecha) elFecha.value = new Date().toISOString().split('T')[0];
+  if (elMon) elMon.value = prefMoneda;
+  // UX: enfocar y seleccionar el campo monto para entrada rápida
+  if (elMonto) {
+    elMonto.focus();
+    try { elMonto.select(); } catch (e) { }
+    // Small timeout helps on some mobile browsers to show the keyboard
+    setTimeout(() => { try { elMonto.focus(); } catch (e) { } }, 50);
+  }
 }
 
 function hideFormIngreso() {
+  // Ocultar y limpiar campos
   document.getElementById('bal-form').style.display = 'none';
+  const elDesc = document.getElementById('i-desc');
+  const elMonto = document.getElementById('i-monto');
+  const elFecha = document.getElementById('i-fecha');
+  if (elDesc) elDesc.value = '';
+  if (elMonto) elMonto.value = '';
+  if (elFecha) elFecha.value = '';
 }
 
 async function saveIngreso() {
@@ -2273,9 +2063,9 @@ async function saveIngreso() {
   try {
     const { error } = await sbWithTimeout(() => sb.from('ingresos').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]));
     if (error) throw error;
-    showToast('Ingreso guardado ✓'); 
-    hideFormIngreso(); 
-    await loadIngresos(); 
+    showToast('Ingreso guardado ✓');
+    hideFormIngreso();
+    await loadIngresos();
     renderBalance();
   } catch (error) {
     showToast('Error: ' + error.message, 'err');
@@ -2305,7 +2095,7 @@ function renderBalance() {
       <div class="metric-label">Balance Neto (Sobrante)</div>
       <div class="metric-value ${neto >= 0 ? 'g' : 'r'}">${fmt(neto)}</div>
     </div>`;
-  document.getElementById('bal-ingresos-list').innerHTML = ingMes.length 
+  document.getElementById('bal-ingresos-list').innerHTML = ingMes.length
     ? ingMes.map(i => `
       <div class="tx-item">
         <div class="tx-dot" style="background:var(--green)22">💰</div>
@@ -2353,16 +2143,16 @@ async function saveMeta() {
   const current = parseFloat(document.getElementById('g-current').value || 0);
   const moneda = document.getElementById('g-moneda').value;
   if (!desc || isNaN(target)) { showToast('Completá los datos', 'err'); return; }
-  
+
   const btn = document.getElementById('g-save-btn');
   if (btn) { btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading'); }
-  
+
   try {
     const { error } = await sbWithTimeout(() => sb.from('metas').insert([{ descripcion: desc, monto_objetivo: target, monto_actual: current, moneda, user_id: currentUser.id }]));
     if (error) throw error;
-    showToast('Meta creada ✓'); 
-    hideFormMeta(); 
-    await loadGoals(); 
+    showToast('Meta creada ✓');
+    hideFormMeta();
+    await loadGoals();
     renderGoals();
   } catch (error) {
     showToast('Error: ' + error.message, 'err');
@@ -2372,10 +2162,10 @@ async function saveMeta() {
 }
 function renderGoals() {
   const el = document.getElementById('goals-list');
-  el.innerHTML = allMetas.length 
+  el.innerHTML = allMetas.length
     ? allMetas.map(m => {
-        const pct = Math.min(Math.round((m.monto_actual / m.monto_objetivo) * 100), 100);
-        return `
+      const pct = Math.min(Math.round((m.monto_actual / m.monto_objetivo) * 100), 100);
+      return `
         <div class="deu-card">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px">
             <span style="font-weight:700">${m.descripcion}</span>
@@ -2391,7 +2181,7 @@ function renderGoals() {
             <button class="btn btn-danger btn-sm" onclick="deleteMeta('${m.id}')">🗑</button>
           </div>
         </div>`;
-      }).join('')
+    }).join('')
     : '<div class="empty">No tienes metas de ahorro todavía.</div>';
 }
 async function updateMetaMonto(id) {
