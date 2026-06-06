@@ -188,7 +188,6 @@ async function showApp() {
   subscribeRealtime();
   
   initForm();
-  setupFormHandlers();
   renderDash();
   updateNotifStatus();
 }
@@ -775,66 +774,18 @@ function renderDash() {
 }
 
 // ─── NUEVO GASTO ─────────────────────────────────────────────────────────────
-// ─── FORM HANDLERS ───────────────────────────────────────────────────────────
-
-/**
- * Manejador de cambios en selects del formulario de gastos.
- * Esta función es un placeholder que permite a navegadores móviles procesar
- * correctamente el cambio de valor sin interferencias.
- */
-function handleSelectChange(selectElement) {
-  // No hacer nada - permite que el navegador procese el evento normalmente
-  // La presencia de este manejador es suficiente para estabilizar el comportamiento en mobile
-}
-
-/**
- * Configura los event listeners para el formulario de gastos.
- * En mobile, después de cambiar un select, hay casos donde el teclado se cierra
- * cuando el usuario intenta hacer click en el siguiente campo. Este setup previene eso.
- */
-function setupFormHandlers() {
-  const fDesc = document.getElementById('f-desc');
-  const fCat = document.getElementById('f-cat');
-  const fPersona = document.getElementById('f-persona');
-  
-  if (!fDesc || !fCat || !fPersona) return;
-  
-  // Prevenir que el navegador cierre el teclado de forma inesperada
-  // Restaurar focus al campo de descripción si se pierde demasiado rápido
-  let descLastBlurTime = 0;
-  fDesc.addEventListener('blur', (e) => {
-    const now = Date.now();
-    if (descLastBlurTime && now - descLastBlurTime < 200) {
-      // Si se perdió el focus muy rápidamente (menos de 200ms), probablemente fue
-      // por interferencia del navegador. Re-enfocar.
-      setTimeout(() => fDesc.focus(), 50);
-    }
-    descLastBlurTime = now;
-  }, true);
-  
-  // También prevenir blur cuando el select está activo
-  let selectWasJustChanged = false;
-  fCat.addEventListener('change', () => {
-    selectWasJustChanged = true;
-    setTimeout(() => { selectWasJustChanged = false; }, 300);
-  });
-  
-  fPersona.addEventListener('change', () => {
-    selectWasJustChanged = true;
-    setTimeout(() => { selectWasJustChanged = false; }, 300);
-  });
-}
+function initForm() {
   const now = new Date();
   document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
   
   // Solo regenerar selects si están vacíos (primera vez)
   const catSelect = document.getElementById('f-cat');
-  if (catSelect.options.length === 0) {
+  if (!catSelect.innerHTML.trim()) {
     catSelect.innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
   }
   
   const personaSelect = document.getElementById('f-persona');
-  if (personaSelect.options.length === 0) {
+  if (!personaSelect.innerHTML.trim()) {
     personaSelect.innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
   }
   
