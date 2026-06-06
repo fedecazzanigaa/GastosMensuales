@@ -936,10 +936,16 @@ async function viewAdjunto(path, tipo) {
 
     const content = document.createElement('div');
     content.className = 'lightbox-content';
+    // Tamaño fijo para que tanto imagen como PDF ocupen el mismo espacio
+    content.style.width = '90vw';
+    content.style.height = '90vh';
 
     if (tipo.startsWith('image/')) {
       const img = document.createElement('img');
       img.src = url;
+      img.style.maxWidth = '100%';
+      img.style.maxHeight = '100%';
+      img.style.objectFit = 'contain';
       content.appendChild(img);
     } else if (tipo === 'application/pdf') {
       const embed = document.createElement('embed');
@@ -1004,6 +1010,11 @@ async function deleteAdjuntoFromGasto(gastoId, adjuntoId) {
     
     showToast('Comprobante eliminado ✓');
     loadHistorial();
+    // Reabrimos el panel del mismo gasto para que el usuario pueda
+    // seguir eliminando otros adjuntos sin tener que presionar el clip nuevamente.
+    const panelId = 'panel-' + gastoId;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.style.display = 'flex';
   } catch (e) {
     console.error('Error:', e);
     showToast('Error al eliminar comprobante', 'err');
@@ -1548,21 +1559,15 @@ function loadHistorial() {
     f.map(g => {
       const adjuntos = g.adjuntos || [];
       const hasAdjuntos = adjuntos.length > 0;
-      const adjuntosHtml = hasAdjuntos ? `
-        <div class="adjuntos-historial" style="display:none" id="info-adjuntos-${g.id}">
-          <span style="font-size:11px;color:var(--text2)">📎 ${adjuntos.length} ${adjuntos.length === 1 ? 'archivo' : 'archivos'}</span>
-        </div>
-      ` : '';
-      
       const adjuntosPanelHtml = hasAdjuntos ? `
-        <div id="panel-${g.id}" class="adjunto-gallery" style="display:none">
+        <div id="panel-${g.id}" class="adjunto-gallery" style="display:none;width:100%;margin-top:8px;flex-basis:100%">
           ${adjuntos.map(adj => `
             <div class="adjunto-gallery-item">
               <div class="adjunto-gallery-name">${getFileIcon(adj.tipo)} ${adj.nombre}</div>
               <div class="adjunto-gallery-actions" style="display:flex;gap:4px">
-                <button class="adjunto-btn" onclick="viewAdjunto('${adj.path}', '${adj.tipo}')" title="Ver archivo" style="width:28px;height:28px">👁️</button>
-                <button class="adjunto-btn" onclick="downloadAdjunto('${adj.path}', '${adj.nombre}')" title="Descargar" style="width:28px;height:28px">⬇️</button>
-                <button class="adjunto-btn adjunto-btn-danger" onclick="deleteAdjuntoFromGasto('${g.id}', '${adj.id}')" title="Eliminar" style="width:28px;height:28px">🗑</button>
+                <button class="adjunto-btn" onclick="viewAdjunto('${adj.path}', '${adj.tipo}')" title="Ver archivo" style="width:28px;height:28px">&#128065;&#65039;</button>
+                <button class="adjunto-btn" onclick="downloadAdjunto('${adj.path}', '${adj.nombre}')" title="Descargar" style="width:28px;height:28px">&#11015;&#65039;</button>
+                <button class="adjunto-btn adjunto-btn-danger" onclick="deleteAdjuntoFromGasto('${g.id}', '${adj.id}')" title="Eliminar" style="width:28px;height:28px">&#128465;</button>
               </div>
             </div>
           `).join('')}
@@ -1570,23 +1575,22 @@ function loadHistorial() {
         </div>
       ` : '';
       
-      return `<div class="tx-item">
+      return `<div class="tx-item" style="flex-wrap:wrap">
         <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
         <div class="tx-info">
           <div class="tx-desc">${g.descripcion || g.categoria}</div>
           <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
-          ${adjuntosHtml}
-          ${adjuntosPanelHtml}
         </div>
         <div class="tx-right">
           <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
           <div class="tx-date">${fdate(g.fecha)}</div>
           <div style="display:flex;gap:4px;justify-content:flex-end;align-items:center">
-            ${hasAdjuntos ? `<button class="btn btn-sm" onclick="toggleAdjuntosPanel('panel-${g.id}')" title="${adjuntos.length} archivo(s)" style="margin-top:4px;padding:3px 6px;font-size:14px;border:1px solid rgba(26, 158, 117, 0.3);background:rgba(26, 158, 117, 0.05);position:relative">📎</button>` : ''}
-            <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">🗑</button>
+            ${hasAdjuntos ? `<button class="btn btn-sm" onclick="toggleAdjuntosPanel('panel-${g.id}')" title="${adjuntos.length} archivo(s)" style="margin-top:4px;padding:3px 6px;font-size:14px;border:1px solid rgba(26, 158, 117, 0.3);background:rgba(26, 158, 117, 0.05);position:relative">&#128206;</button>` : ''}
+            <button class="btn btn-sm" onclick="editarGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px;border:1px solid var(--border)">&#9999;&#65039;</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteGasto('${g.id}')" style="margin-top:4px;padding:3px 8px;font-size:12px">&#128465;</button>
           </div>
         </div>
+        ${adjuntosPanelHtml}
       </div>`;
     }).join('')
     : '<div class="empty"><div class="empty-icon">🔍</div>Sin resultados</div>';
