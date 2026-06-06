@@ -1,43 +1,75 @@
-# Gastos Mensuales #
+# Gastos Mensuales
 
-De forma fácil, rápida e intuitiva; lleva los gastos mensuales por día/mes/persona de la familia.
+Gastos Mensuales es una aplicación web ligera diseñada para hacer el seguimiento de los gastos familiares de forma rápida, clara e intuitiva.
 
-# Resumen #
-Obtene un resumen rápido con lo gastado;
+## Descripción
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/7a5d8547-da49-46f2-8115-b11159f633c0" />
+Permite registrar gastos diarios, revisar balances mensuales, generar reportes y monitorear deudas con tarjeta. Está orientada a familias o grupos de personas que desean tener control de sus finanzas personales sin complicaciones.
 
-. Gráfico lineal con % de gastos por CATEGORIA.
-. Últimos gastos.
-. Cuotas a pagar en el mes corriente.
+## Características principales
 
-# Nuevo Gasto #
-Carga fácil un nuevo gasto por día, categoría, persona y monto.
+- Panel de resumen con los gastos totales.
+- Gráficos de distribución por categoría.
+- Registro de nuevos gastos con fecha, categoría, persona y monto.
+- Historial de gastos con filtros por categoría, persona y mes.
+- Reportes descargables en formatos compatibles con Excel y PDF.
+- Gestión de deudas en cuotas con tarjeta.
+- Configuración de categorías de gasto personalizada.
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/5188c6fa-c194-41dc-8ec0-9600ac69d465" />
+## Estructura del proyecto
 
-# Historial #
-Consulta los gastos realizados.
-Se puede consultar por; 
-Categoría de gasto, Persona que hizo el gasto y mes.
+- `index.html` — Interfaz y estructura de la aplicación.
+- `styles.css` — Estilos visuales y diseño responsivo.
+- `app.js` — Lógica principal de la aplicación.
+- `manifest.json` — Metadatos de la aplicación.
+- `icons/` — Iconos utilizados en la UI.
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/bb708edb-e6d9-42c8-b05f-8b996e1a20b4" />
+## Requisitos
 
-# Reportes #
-Obtene reportes de forma sencilla y fácil por mes. Se puede obtener un archivo "Excel" y/o "PDF" en caso de ser necesario.
+- Navegador moderno (Chrome, Firefox, Safari, Edge).
+- No requiere servidor ni instalación de paquetes adicionales para correr localmente.
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/988c713f-021c-4711-9af6-002baf79b242" />
+## Instalación y puesta en marcha
 
-PDF.
+1. Clona el repositorio o descarga los archivos.
 
-<img width="904" height="395" alt="image" src="https://github.com/user-attachments/assets/10269a1a-59c1-49eb-aecd-0208ac7d3e7d" />
+```bash
+git clone https://github.com/<usuario>/GastosMensuales.git
+cd GastosMensuales
+```
 
-# Deudas #
-Carga las compras que se hicieron con Tarjeta. Se pueden ingresar número de cuotas, monto total y la tarjeta con la cual se realizó la compra.
+2. Abre `index.html` directamente en el navegador.
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/8dc8fea8-573f-4583-829b-09d34ed793ab" />
+> Nota: si prefieres usar un servidor local, también puedes iniciar uno con Python:
+>
+> ```bash
+> python3 -m http.server 8000
+> ```
+>
+> Luego visita `http://localhost:8000`.
 
-# Config #
-Agregá categorías para tus gastos de forma sencilla.
+## Uso
 
-<img width="250" height="516" alt="image" src="https://github.com/user-attachments/assets/ed4039f2-b466-468e-a9ba-7f386b950385" />
+1. Navega hasta el panel principal para ver el resumen de gastos.
+2. Usa la sección "Nuevo Gasto" para registrar un gasto con fecha, categoría, persona y monto.
+3. Revisa el historial para filtrar gastos por persona, categoría o mes.
+4. Genera reportes mensuales en Excel o PDF según lo necesites.
+5. Registra deudas con tarjeta en la sección correspondiente para controlar cuotas.
+6. Configura nuevas categorías de gasto en la sección de configuración.
+
+## Contribuir
+
+Si deseas mejorar la aplicación:
+
+1. Crea un fork del repositorio.
+2. Crea una rama nueva para tu función o corrección.
+3. Envía un pull request con los cambios y una breve descripción.
+
+## Notas adicionales
+
+- El proyecto está pensado como una aplicación de front-end simple.
+- Si agregas persistencia de datos o backend, documenta los nuevos pasos en este README.
+
+---
+
+Si querés, puedo también ayudarte a añadir una sección de `Issues conocidos` o a convertir esto en un README bilingüe (español / inglés).
