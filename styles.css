@@ -942,7 +942,10 @@ body {
   position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
   background: var(--surface); border: 1.5px solid var(--border);
   border-radius: var(--radius-sm); box-shadow: 0 4px 16px rgba(0,0,0,.12);
-  overflow: hidden;
+  /* Hacer la lista desplazable y limitar altura para permitir scroll en móviles */
+  max-height: 220px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .ms-item {
   display: flex; align-items: center; gap: 10px;
@@ -957,7 +960,30 @@ body {
   background: var(--surface); transition: all .15s;
 }
 .ms-check.on { background: var(--accent); border-color: var(--accent); }
-.ms-check.on::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid white; border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); }
+.ms-check.on::after { content: ''; display: block; width: 5px; height: 9px; border: 2px solid var(--text-on-accent); border-top: none; border-left: none; transform: rotate(45deg) translateY(-1px); }
+
+/* Error highlight + shake animation for ms-trigger */
+.ms-trigger.error {
+  border-color: var(--red);
+}
+.ms-trigger.error span { color: var(--red); }
+.ms-trigger.shake { animation: shake .42s cubic-bezier(.36,.07,.19,.97); }
+@keyframes shake {
+  0% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+  100% { transform: translateX(0); }
+}
+
+/* Error styles for standard inputs (monto, descripcion, etc.) */
+.fg input.error, .fg textarea.error {
+  border-color: var(--red) !important;
+}
+.fg input.shake, .fg textarea.shake {
+  animation: shake .42s cubic-bezier(.36,.07,.19,.97);
+}
 
 /* ── CHART ── */
 .chart-container { position: relative; height: 180px; width: 100%; margin-top: 10px; }

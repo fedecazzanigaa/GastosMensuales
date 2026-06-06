@@ -135,17 +135,39 @@
           <div class="fg"><label>Monto</label>
             <div style="display:flex;gap:8px">
               <input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal" style="flex:1">
-              <select id="f-moneda" style="width:90px">
-                <option value="ARS">ARS</option>
-                <option value="USD">USD</option>
-              </select>
+              <div style="width:90px">
+                <div class="ms-wrap">
+                  <div class="ms-trigger" id="f-moneda-trigger" onclick="toggleMs('f-moneda-ms', event)">
+                    <span id="f-moneda-label">ARS</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                  </div>
+                  <input type="hidden" id="f-moneda" value="ARS">
+                  <div class="ms-dropdown" id="f-moneda-ms" style="display:none"></div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
         <div class="form-2">
-          <div class="fg"><label>Categoría</label><select id="f-cat"></select></div>
+          <div class="fg"><label>Categoría</label>
+            <div class="ms-wrap">
+              <div class="ms-trigger" id="f-cat-trigger" onclick="toggleMs('f-cat-ms', event)">
+                <span id="f-cat-label">Seleccione</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+              </div>
+              <input type="hidden" id="f-cat" value="">
+              <div class="ms-dropdown" id="f-cat-ms" style="display:none"></div>
+            </div>
+          </div>
           <div class="fg"><label>¿Quién pagó?</label>
-            <select id="f-persona"></select>
+            <div class="ms-wrap">
+              <div class="ms-trigger" id="f-persona-trigger" onclick="toggleMs('f-persona-ms', event)">
+                <span id="f-persona-label">Seleccione</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+              </div>
+              <input type="hidden" id="f-persona" value="">
+              <div class="ms-dropdown" id="f-persona-ms" style="display:none"></div>
+            </div>
           </div>
         </div>
         <div class="fg"><label>Descripción</label><input type="text" id="f-desc" placeholder="Ej: Supermercado Coto, factura luz..."></div>

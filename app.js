@@ -778,14 +778,22 @@ function initForm() {
   const now = new Date();
   document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
   
-  document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-  document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
-  
-  document.getElementById('f-moneda').value = prefMoneda;
+  // Inicializar valores y construir dropdowns visuales (single-select)
+  const fmon = document.getElementById('f-moneda'); if (fmon) fmon.value = prefMoneda;
+  const fmonLbl = document.getElementById('f-moneda-label'); if (fmonLbl) fmonLbl.textContent = prefMoneda;
+
+  const fcat = document.getElementById('f-cat'); if (fcat) fcat.value = '';
+  const fcatLbl = document.getElementById('f-cat-label'); if (fcatLbl) fcatLbl.textContent = 'Seleccione';
+
+  const fper = document.getElementById('f-persona'); if (fper) fper.value = '';
+  const fperLbl = document.getElementById('f-persona-label'); if (fperLbl) fperLbl.textContent = 'Seleccione';
+
+  buildGastoDropdowns();
 
   const currentProfile = usuarios.find(u => u.id === currentUser.id);
-  if (currentProfile) {
-    document.getElementById('f-persona').value = currentProfile.name;
+  if (currentProfile && fper) {
+    fper.value = currentProfile.name;
+    if (fperLbl) fperLbl.textContent = currentProfile.name;
   }
 }
 
@@ -812,9 +820,52 @@ async function saveGasto() {
 
   if (!fecha) { showToast('Ingresá la fecha', 'err'); return; }
   if (!montoRaw || isNaN(monto) || monto <= 0) {
-    showToast('Ingresá un monto válido', 'err'); return;
+    const mEl = document.getElementById('f-monto');
+    if (mEl) {
+      mEl.classList.add('error');
+      void mEl.offsetWidth;
+      mEl.classList.add('shake');
+      mEl.addEventListener('animationend', function _onend() { mEl.classList.remove('shake'); mEl.removeEventListener('animationend', _onend); });
+      setTimeout(() => { mEl.classList.remove('error'); }, 1400);
+      try { mEl.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
+    }
+    showToast('Ingresá un monto válido', 'err');
+    return;
   }
-  if (!desc) { showToast('Ingresá una descripción', 'err'); return; }
+
+  if (!cat) {
+    // Visual highlight + shake en el trigger de categoría
+    const trg = document.getElementById('f-cat-trigger');
+    if (trg) {
+      trg.classList.add('error');
+      // trigger reflow then add shake to restart animation reliably
+      void trg.offsetWidth;
+      trg.classList.add('shake');
+      // limpiar clases después de la animación
+      trg.addEventListener('animationend', function _onend() {
+        trg.classList.remove('shake');
+        trg.removeEventListener('animationend', _onend);
+      });
+      // eliminar estado de error luego de un tiempo
+      setTimeout(() => { trg.classList.remove('error'); }, 1400);
+      try { trg.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch(e) {}
+    }
+    showToast('Seleccioná una categoría', 'err');
+    return;
+  }
+  if (!desc) {
+    const dEl = document.getElementById('f-desc');
+    if (dEl) {
+      dEl.classList.add('error');
+      void dEl.offsetWidth;
+      dEl.classList.add('shake');
+      dEl.addEventListener('animationend', function _onend2() { dEl.classList.remove('shake'); dEl.removeEventListener('animationend', _onend2); });
+      setTimeout(() => { dEl.classList.remove('error'); }, 1400);
+      try { dEl.focus(); } catch(e) {}
+    }
+    showToast('Ingresá una descripción', 'err');
+    return;
+  }
 
   const btn = document.getElementById('save-btn');
   btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
@@ -910,18 +961,36 @@ function editarGasto(id) {
   // Ahora sí, asignamos los valores del gasto a los campos (sin initForm de por medio)
   document.getElementById('f-fecha').value = g.fecha || '';
   document.getElementById('f-monto').value = g.monto || '';
-  document.getElementById('f-moneda').value = g.moneda || 'ARS';
-  
-  // Asegurar que los selects tengan opciones cargadas (si no lo están)
-  if (document.getElementById('f-cat').options.length === 0) {
-    document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+
+  // Si los elementos son selects nativos (no reemplazados), mantenemos compatibilidad.
+  const fmon = document.getElementById('f-moneda');
+  if (fmon && fmon.tagName === 'SELECT') {
+    fmon.value = g.moneda || 'ARS';
+  } else if (fmon) {
+    fmon.value = g.moneda || 'ARS';
+    const lbl = document.getElementById('f-moneda-label'); if (lbl) lbl.textContent = fmon.value || 'ARS';
   }
-  if (document.getElementById('f-persona').options.length === 0) {
-    document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+
+  // Categoría
+  const fcat = document.getElementById('f-cat');
+  if (fcat && fcat.tagName === 'SELECT') {
+    if (fcat.options.length === 0) fcat.innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+    fcat.value = g.categoria || '';
+  } else if (fcat) {
+    fcat.value = g.categoria || '';
+    const lbl = document.getElementById('f-cat-label'); if (lbl) lbl.textContent = fcat.value || 'Seleccione';
   }
-  
-  document.getElementById('f-cat').value = g.categoria || '';
-  document.getElementById('f-persona').value = g.persona || '';
+
+  // Persona
+  const fper = document.getElementById('f-persona');
+  if (fper && fper.tagName === 'SELECT') {
+    if (fper.options.length === 0) fper.innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
+    fper.value = g.persona || '';
+  } else if (fper) {
+    fper.value = g.persona || '';
+    const lbl = document.getElementById('f-persona-label'); if (lbl) lbl.textContent = fper.value || 'Seleccione';
+  }
+
   document.getElementById('f-desc').value = g.descripcion || '';
   document.getElementById('f-notas').value = g.notas || '';
   
@@ -947,6 +1016,14 @@ function toggleMs(id, event) {
     if (d.id !== id) d.style.display = 'none';
   });
   
+  // Si vamos a abrir un dropdown relacionado con el formulario de gasto,
+  // asegurarnos de reconstruir su contenido para que el check refleje
+  // la selección actual.
+  if (!isOpen) {
+    // Reconstruir solo los dropdowns del gasto si existen
+    if (id.startsWith('f-')) buildGastoDropdowns();
+  }
+
   el.style.display = isOpen ? 'none' : 'block';
 }
 
@@ -966,7 +1043,7 @@ document.addEventListener('click', e => {
 });
 
 function buildMsCat() {
-  const items = categorias.map(c => c.nombre);
+  const items = categorias.slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })).map(c => c.nombre);
   const el = document.getElementById('ms-cat');
   el.innerHTML =
     `<div class="ms-item" onclick="msCatToggle('__all__')">
@@ -1013,6 +1090,72 @@ function buildMsPer() {
   if (msPerSel.size === 0) lbl.textContent = 'Todos';
   else if (msPerSel.size === 1) lbl.textContent = [...msPerSel][0];
   else lbl.textContent = `${msPerSel.size} personas`;
+}
+
+// Construye los dropdowns single-select usados en el formulario de nuevo gasto
+function buildGastoDropdowns() {
+  // Moneda
+  const monedas = ['ARS', 'USD'];
+  const mEl = document.getElementById('f-moneda-ms');
+  if (mEl) {
+    mEl.innerHTML = monedas.map(item =>
+      `<div class="ms-item" onclick="selectFMoneda('${item}', event)">
+         <div class="ms-check ${document.getElementById('f-moneda')?.value === item ? 'on' : ''}"></div>
+         <span>${item}</span>
+       </div>`
+    ).join('');
+  }
+
+  // Categorías
+  const cEl = document.getElementById('f-cat-ms');
+  if (cEl) {
+    const sortedCats = categorias.slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+    cEl.innerHTML = sortedCats.map(item =>
+      `<div class="ms-item" onclick="selectFCat('${item.nombre}', event)">
+         <div class="ms-check ${document.getElementById('f-cat')?.value === item.nombre ? 'on' : ''}"></div>
+         <span>${item.nombre}</span>
+       </div>`
+    ).join('');
+  }
+
+  // Personas
+  const pEl = document.getElementById('f-persona-ms');
+  if (pEl) {
+    const items = [...usuarios.map(u => u.name), 'Ambos'];
+    pEl.innerHTML = items.map(item =>
+      `<div class="ms-item" onclick="selectFPersona('${item}', event)">
+         <div class="ms-check ${document.getElementById('f-persona')?.value === item ? 'on' : ''}"></div>
+         <span>${item}</span>
+       </div>`
+    ).join('');
+  }
+}
+
+function selectFMoneda(val, event) {
+  if (event) event.stopPropagation();
+  const input = document.getElementById('f-moneda'); if (input) input.value = val;
+  const lbl = document.getElementById('f-moneda-label'); if (lbl) lbl.textContent = val;
+  const el = document.getElementById('f-moneda-ms'); if (el) el.style.display = 'none';
+  // Actualizar checks
+  buildGastoDropdowns();
+}
+
+function selectFCat(val, event) {
+  if (event) event.stopPropagation();
+  const input = document.getElementById('f-cat'); if (input) input.value = val;
+  const lbl = document.getElementById('f-cat-label'); if (lbl) lbl.textContent = val;
+  const el = document.getElementById('f-cat-ms'); if (el) el.style.display = 'none';
+  // Actualizar checks
+  buildGastoDropdowns();
+}
+
+function selectFPersona(val, event) {
+  if (event) event.stopPropagation();
+  const input = document.getElementById('f-persona'); if (input) input.value = val;
+  const lbl = document.getElementById('f-persona-label'); if (lbl) lbl.textContent = val;
+  const el = document.getElementById('f-persona-ms'); if (el) el.style.display = 'none';
+  // Actualizar checks
+  buildGastoDropdowns();
 }
 
 function msPerToggle(val, event) {
@@ -1738,7 +1881,7 @@ function renderMetrics() {
   
   buildMsMetCat();
   
-  const catsToShow = msMetCatSel.size > 0 ? Array.from(msMetCatSel) : categorias.map(c => c.nombre);
+  const catsToShow = msMetCatSel.size > 0 ? Array.from(msMetCatSel) : categorias.slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })).map(c => c.nombre);
   const datasets = getEvolutionDataByCategory(catsToShow, 3);
   
   if (metEvoChart) metEvoChart.destroy();
@@ -1810,7 +1953,7 @@ function renderMetrics() {
 }
 
 function buildMsMetCat() {
-  const items = categorias.map(c => c.nombre);
+  const items = categorias.slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })).map(c => c.nombre);
   const el = document.getElementById('ms-met-cat');
   if (!el) return;
   el.innerHTML =
