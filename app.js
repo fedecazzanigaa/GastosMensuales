@@ -2194,6 +2194,9 @@ function showFormIngreso() {
   document.getElementById('bal-form').style.display = 'block';
   document.getElementById('i-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('i-moneda').value = prefMoneda;
+  document.getElementById('i-desc').value = '';
+  document.getElementById('i-monto').value = '';
+  document.getElementById('i-desc').focus();
 }
 
 function hideFormIngreso() {
