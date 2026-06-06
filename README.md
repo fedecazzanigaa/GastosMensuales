@@ -34,7 +34,7 @@ Permite registrar gastos diarios, revisar balances mensuales, generar reportes y
 1. Clona el repositorio o descarga los archivos.
 
 ```bash
-git clone https://github.com/<usuario>/GastosMensuales.git
+git clone https://github.com/fedecazzanigaa/GastosMensuales.git
 cd GastosMensuales
 ```
 
@@ -65,11 +65,3 @@ Si deseas mejorar la aplicación:
 2. Crea una rama nueva para tu función o corrección.
 3. Envía un pull request con los cambios y una breve descripción.
 
-## Notas adicionales
-
-- El proyecto está pensado como una aplicación de front-end simple.
-- Si agregas persistencia de datos o backend, documenta los nuevos pasos en este README.
-
----
-
-Si querés, puedo también ayudarte a añadir una sección de `Issues conocidos` o a convertir esto en un README bilingüe (español / inglés).
