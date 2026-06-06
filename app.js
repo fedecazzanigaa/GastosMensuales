@@ -747,25 +747,6 @@ function initForm() {
   if (fMon && !fMon.value) fMon.value = prefMoneda;
 }
 
-// Evita que el teclado virtual quede abierto después de seleccionar
-// (usado en los <select> del formulario: f-cat y f-persona)
-function handleSelectChange(el) {
-  try {
-    const active = document.activeElement;
-    if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-      active.blur();
-      // En algunos móviles iOS es necesario un pequeño retardo
-      setTimeout(() => {
-        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
-          document.activeElement.blur();
-        }
-      }, 50);
-    }
-  } catch (e) {
-    console.warn('handleSelectChange error', e);
-  }
-}
-
 const BTN_LABEL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20,6 9,17 4,12"/></svg> Guardar gasto';
 function resetSaveBtn() {
   const btn = document.getElementById('save-btn');
