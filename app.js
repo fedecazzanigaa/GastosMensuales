@@ -778,16 +778,8 @@ function initForm() {
   const now = new Date();
   document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
   
-  // Solo regenerar selects si están vacíos (primera vez)
-  const catSelect = document.getElementById('f-cat');
-  if (!catSelect.innerHTML.trim()) {
-    catSelect.innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
-  }
-  
-  const personaSelect = document.getElementById('f-persona');
-  if (!personaSelect.innerHTML.trim()) {
-    personaSelect.innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
-  }
+  document.getElementById('f-cat').innerHTML = categorias.map(c => `<option value="${c.nombre}">${c.nombre}</option>`).join('');
+  document.getElementById('f-persona').innerHTML = usuarios.map(u => `<option value="${u.name}">${u.name}</option>`).join('') + '<option value="Ambos">Ambos</option>';
   
   document.getElementById('f-moneda').value = prefMoneda;
 
@@ -2200,13 +2192,8 @@ async function loadIngresos() {
 
 function showFormIngreso() {
   document.getElementById('bal-form').style.display = 'block';
-  // Limpiar todos los campos del formulario
-  document.getElementById('i-desc').value = '';
-  document.getElementById('i-monto').value = '';
   document.getElementById('i-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('i-moneda').value = prefMoneda;
-  // Enfocar en el primer campo para facilitar el input
-  document.getElementById('i-desc').focus();
 }
 
 function hideFormIngreso() {
