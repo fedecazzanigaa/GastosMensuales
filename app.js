@@ -2723,7 +2723,7 @@ function hideFormIngreso() {
 
 async function saveIngreso() {
   const desc = document.getElementById('i-desc').value.trim();
-  const monto = parseFloat(document.getElementById('i-monto').value);
+  const monto = parseInputFloat(document.getElementById('i-monto').value);
   const moneda = document.getElementById('i-moneda').value;
   const fecha = document.getElementById('i-fecha').value;
   if (!desc || isNaN(monto) || !fecha) { showToast('Completá los datos', 'err'); return; }
@@ -2808,8 +2808,8 @@ function hideFormMeta() {
 }
 async function saveMeta() {
   const desc = document.getElementById('g-desc').value.trim();
-  const target = parseFloat(document.getElementById('g-target').value);
-  const current = parseFloat(document.getElementById('g-current').value || 0);
+  const target = parseInputFloat(document.getElementById('g-target').value);
+  const current = parseInputFloat(document.getElementById('g-current').value || 0);
   const moneda = document.getElementById('g-moneda').value;
   if (!desc || isNaN(target)) { showToast('Completá los datos', 'err'); return; }
   
@@ -2857,8 +2857,8 @@ async function updateMetaMonto(id) {
   const m = allMetas.find(x => x.id === id);
   const nuevo = prompt(`¿Cuánto tienes ahorrado ahora para "${m.descripcion}"?`, m.monto_actual);
   if (nuevo === null) return;
-  const val = parseFloat(nuevo);
-  if (isNaN(val)) return;
+  const val = parseInputFloat(nuevo);
+  if (isNaN(val) || val < 0) return;
   try {
     const { error } = await sbWithTimeout(() => sb.from('metas').update({ monto_actual: val }).eq('id', id));
     if (error) throw error;

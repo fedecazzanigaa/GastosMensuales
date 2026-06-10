@@ -134,7 +134,7 @@
           <div class="fg"><label>Fecha</label><input type="date" id="f-fecha" onclick="this.showPicker()"></div>
           <div class="fg"><label>Monto</label>
             <div style="display:flex;gap:8px">
-              <input type="number" id="f-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal" style="flex:1">
+              <input type="text" id="f-monto" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*" style="flex:1">
               <div style="width:90px">
                 <div class="ms-wrap">
                   <div class="ms-trigger" id="f-moneda-trigger" onclick="toggleMs('f-moneda-ms', event)">
@@ -308,7 +308,7 @@
         <div class="card-title">Nueva compra en cuotas</div>
         <div class="fg"><label>Descripción</label><input type="text" id="d-desc" placeholder="Ej: Smart TV Samsung"></div>
         <div class="form-2">
-          <div class="fg"><label>Monto total</label><input type="number" id="d-monto" placeholder="0.00" min="0" step="0.01" inputmode="decimal"></div>
+          <div class="fg"><label>Monto total</label><input type="text" id="d-monto" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*"></div>
           <div class="fg"><label>Moneda</label>
             <select id="d-moneda">
               <option value="ARS">$ Pesos</option>
@@ -355,7 +355,7 @@
         <div class="card-title">Nuevo Gasto Fijo</div>
         <div class="fg"><label>Descripción</label><input type="text" id="rf-desc" placeholder="Ej: Netflix, Expensas..."></div>
         <div class="form-2">
-          <div class="fg"><label>Monto $</label><input type="number" id="rf-monto" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label>Monto $</label><input type="text" id="rf-monto" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*"></div>
           <div class="fg"><label>Moneda</label>
             <select id="rf-moneda">
               <option value="ARS">$ Pesos</option>
@@ -407,7 +407,7 @@
             <input type="color" class="color-pick" id="new-cat-color" value="#1D9E75">
           </div>
           <div style="display:flex;gap:8px;margin-top:8px">
-            <input type="number" id="new-cat-ppto" placeholder="Presupuesto mensual $" style="flex:1">
+            <input type="text" id="new-cat-ppto" placeholder="Presupuesto mensual $" inputmode="decimal" pattern="[0-9.,]*" style="flex:1">
             <button class="btn btn-primary btn-sm" onclick="addCategoria()" style="width:42px">+</button>
           </div>
         </div>
@@ -448,7 +448,7 @@
         <div class="card-title">Nuevo Ingreso</div>
         <div class="fg"><label>Descripción</label><input type="text" id="i-desc" placeholder="Ej: Sueldo, Venta..."></div>
         <div class="form-2">
-          <div class="fg"><label>Monto</label><input type="number" id="i-monto" placeholder="0.00" step="0.01"></div>
+          <div class="fg"><label>Monto</label><input type="text" id="i-monto" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*"></div>
           <div class="fg"><label>Moneda</label>
             <select id="i-moneda">
               <option value="ARS">ARS</option>
@@ -475,7 +475,7 @@
         <div class="card-title">Nueva Meta</div>
         <div class="fg"><label>¿Qué quieres lograr?</label><input type="text" id="g-desc" placeholder="Ej: Viaje a Europa"></div>
         <div class="form-2">
-          <div class="fg"><label>Monto Objetivo</label><input type="number" id="g-target" placeholder="0.00"></div>
+          <div class="fg"><label>Monto Objetivo</label><input type="text" id="g-target" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*"></div>
           <div class="fg"><label>Moneda</label>
             <select id="g-moneda">
               <option value="ARS">ARS</option>
@@ -483,7 +483,7 @@
             </select>
           </div>
         </div>
-        <div class="fg"><label>Monto Actual (Ahorrado)</label><input type="number" id="g-current" value="0"></div>
+        <div class="fg"><label>Monto Actual (Ahorrado)</label><input type="text" id="g-current" value="0" inputmode="decimal" pattern="[0-9.,]*"></div>
         <button class="btn btn-primary" id="g-save-btn" onclick="saveMeta()">Guardar</button>
         <button class="btn" onclick="hideFormMeta()">Cancelar</button>
       </div>
