@@ -482,7 +482,7 @@ let realtimeChannel = null;
 function subscribeRealtime() {
   if (realtimeChannel) sb.removeChannel(realtimeChannel);
   
-  realtimeChannel = sb.channel('public:gastos')
+  realtimeChannel = sb.channel('db-changes')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'gastos' }, async (payload) => {
       // Recargar datos solo cuando sea necesario
       const { data } = await sb
@@ -510,6 +510,10 @@ function subscribeRealtime() {
           }
         }
       }
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ingresos' }, async (payload) => {
+      await loadIngresos();
+      renderBalance();
     })
     .subscribe();
 }
@@ -2167,19 +2171,16 @@ function renderDeudas() {
     for (let i = 0; i < 12; i++) {
       const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
       const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const total = getCuotasMes(ym);
-      mesesData.push({ label: MESES_SHORT[d.getMonth()], ym, total });
+      const totalARS = getCuotasMes(ym);
+      const total = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+      const label = `${MESES_SHORT[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`;
+      mesesData.push({ label, value: total });
     }
-    const maxVal = Math.max(...mesesData.map(m => m.total), 1);
+
     document.getElementById('deu-grafico').innerHTML =
-      '<div class="bar-chart">' +
-      mesesData.map(m => `
-        <div class="bar-col">
-          <div class="bar-col-val">${m.total > 0 ? '$'+Math.round(m.total/1000)+'k' : ''}</div>
-          <div class="bar-col-bar" style="height:${Math.max(m.total/maxVal*100,2)}px;background:${m.total>0?'var(--blue)':'var(--border)'}"></div>
-          <div class="bar-col-lbl">${m.label}</div>
-        </div>`).join('') +
-      '</div>';
+      '<div class="chart-container" style="height:150px"><canvas id="deuChart"></canvas></div>';
+    const ctx = document.getElementById('deuChart');
+    deuChart = drawLineChart(ctx, deuChart, [{ label: 'Cuotas', data: mesesData, color: '#185FA5' }]);
   } else {
     grafCard.style.display = 'none';
   }
@@ -2225,6 +2226,7 @@ function renderDeudas() {
 
 // ─── EVOLUCIÓN (CHART) ───────────────────────────────────────────────────────
 let evoChart = null;
+let deuChart = null;
 let metEvoChart = null;
 let msMetCatSel = new Set();
 
@@ -2237,12 +2239,13 @@ function renderEvolutionChart() {
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const total = allGastos
+    const totalARS = allGastos
       .filter(g => g.fecha && g.fecha.startsWith(ym))
       .reduce((s, g) => {
         const m = parseFloat(g.monto || 0);
         return s + (g.moneda === 'USD' ? m * dolarHoy : m);
       }, 0);
+    const total = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
     data.push({ label: `${MESES_SHORT[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`, value: total });
   }
 
