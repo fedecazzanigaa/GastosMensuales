@@ -2280,7 +2280,8 @@ function renderMetrics() {
         fill: false,
         tension: 0,
         borderWidth: 3,
-        pointRadius: 4,
+        pointRadius: 2,
+        pointHoverRadius: 4,
         borderDash: (ctx) => ctx.index === (datasets[0].labels.length - 1) ? [5, 5] : [], // Punteado para el ultimo punto (proyeccion)
         segment: {
           borderDash: (ctx) => ctx.p0DataIndex === (datasets[0].labels.length - 2) ? [5, 5] : []
@@ -2366,25 +2367,29 @@ function getEvolutionDataByCategory(cats, months) {
   const datasets = [];
   const now = new Date();
   const labels = [];
+  const ymKeys = []; // YYYY-MM para filtrar fechas en DB
   
   // Etiquetas: meses anteriores + proyección
   for (let i = months; i >= 1; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    labels.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    labels.push(`${MESES_SHORT[d.getMonth()]} ${d.getFullYear()}`);
+    ymKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
   // Mes actual
-  labels.push(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  labels.push(`${MESES_SHORT[now.getMonth()]} ${now.getFullYear()}`);
+  ymKeys.push(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   // Mes proyección
   const projDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  labels.push(`${projDate.getFullYear()}-${String(projDate.getMonth() + 1).padStart(2, '0')}`);
+  labels.push(`${MESES_SHORT[projDate.getMonth()]} ${projDate.getFullYear()} (Proy.)`);
+  ymKeys.push(null); // placeholder, no se usa para filtrar
 
   cats.forEach(catName => {
     const values = [];
     const cInfo = categorias.find(c => c.nombre === catName) || { color: '#888' };
     
-    // Valores reales
-    for (let i = 0; i < labels.length - 1; i++) {
-      const ym = labels[i];
+    // Valores reales (excluye el último que es proyección)
+    for (let i = 0; i < ymKeys.length - 1; i++) {
+      const ym = ymKeys[i];
       const total = allGastos
         .filter(g => g.categoria === catName && g.fecha && g.fecha.startsWith(ym))
         .reduce((s, g) => {
@@ -2395,8 +2400,7 @@ function getEvolutionDataByCategory(cats, months) {
       values.push(total);
     }
     
-    // Proyección: promedio de los últimos X meses (incluyendo el actual que puede estar incompleto, o solo los anteriores?)
-    // Vamos a usar el promedio de los meses reales mostrados
+    // Proyección: promedio de los meses reales mostrados
     const avg = values.reduce((s, v) => s + v, 0) / (values.length);
     values.push(avg);
     
@@ -2412,6 +2416,7 @@ function getEvolutionDataByCategory(cats, months) {
 }
 
 function drawLineChart(ctx, chartInstance, datasets) {
+
   if (chartInstance) chartInstance.destroy();
   
   const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -2430,9 +2435,9 @@ function drawLineChart(ctx, chartInstance, datasets) {
         fill: true,
         tension: 0,
         borderWidth: 3,
-        pointRadius: 4,
+        pointRadius: 2,
         pointBackgroundColor: ds.color,
-        pointHoverRadius: 6
+        pointHoverRadius: 4
       }))
     },
     options: {
