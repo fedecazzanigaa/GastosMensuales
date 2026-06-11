@@ -842,6 +842,9 @@ body {
 
 .rep-scroll tr:last-child td {
   border-bottom: none;
+}
+
+.rep-scroll tr.rep-total-row td {
   font-weight: 700;
 }
 

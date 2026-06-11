@@ -1665,17 +1665,79 @@ function previewReporte() {
     const montoARS = getMontoARS(g);
     catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
   });
+  // Agrupar y ordenar por categoría (alfabético)
+  const catGroups = {};
+  list.forEach(g => {
+    if (!catGroups[g.categoria]) catGroups[g.categoria] = { total: 0, gastos: [] };
+    catGroups[g.categoria].total += getMontoARS(g);
+    catGroups[g.categoria].gastos.push(g);
+  });
+  const catsSorted = Object.keys(catGroups).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+
+  const detallePorCatHtml = catsSorted.map(cat => {
+    const { total: subtotal, gastos: gs } = catGroups[cat];
+    const gastosRows = gs
+      .sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''))
+      .map(g => `<tr>
+        <td style="white-space:nowrap;padding:4px 6px">${fdate(g.fecha)}</td>
+        <td style="padding:4px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(g.descripcion || '-').replace(/"/g, '&quot;')}">${g.descripcion || '-'}</td>
+        <td style="padding:4px 6px">${g.persona}</td>
+        <td style="text-align:right;padding:4px 6px;font-weight:500">${fmtGasto(g.monto, g.moneda)}</td>
+      </tr>`).join('');
+    return `
+      <div style="margin-bottom:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:${catColor(cat)}22;border-bottom:1px solid var(--border)">
+          <span style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px">
+            <span style="width:10px;height:10px;border-radius:50%;background:${catColor(cat)};display:inline-block"></span>${cat}
+          </span>
+          <span style="font-weight:700;font-size:13px">${fmt(subtotal)}</span>
+        </div>
+        <div class="rep-scroll">
+          <table style="width:100%;table-layout:fixed">
+            <colgroup>
+              <col style="width:90px">
+              <col style="width:auto">
+              <col style="width:80px">
+              <col style="width:105px">
+            </colgroup>
+            <tr style="font-size:11px;color:var(--text2)">
+              <th style="padding:4px 6px;text-align:left">Fecha</th>
+              <th style="padding:4px 6px;text-align:left">Descripción</th>
+              <th style="padding:4px 6px;text-align:left">Persona</th>
+              <th style="padding:4px 6px;text-align:right">Monto</th>
+            </tr>
+            ${gastosRows}
+          </table>
+        </div>
+      </div>`;
+  }).join('');
+
   div.innerHTML = `<div class="rep-total"><span>${label} · ${list.length} gastos</span><span>${fmt(total)}</span></div>` +
     Object.entries(catMap).sort((a, b) => b[1] - a[1]).map(([c, v]) => `
   <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
     <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${catColor(c)};display:inline-block"></span>${c}</span>
     <span style="font-weight:600">${fmt(v)}</span>
   </div>`).join('') +
-    `<div class="rep-scroll" style="margin-top:14px"><table>
-  <tr><th>Fecha</th><th>Descripción</th><th>Cat.</th><th>Quién</th><th style="text-align:right">Monto</th></tr>
-  ${list.map(g => `<tr><td style="white-space:nowrap">${fdate(g.fecha)}</td><td>${g.descripcion || '-'}</td><td>${g.categoria}</td><td>${g.persona}</td><td style="text-align:right;font-weight:600">${fmtGasto(g.monto, g.moneda)}</td></tr>`).join('')}
-  <tr><td colspan="4">TOTAL (${prefMoneda})</td><td style="text-align:right">${fmt(total)}</td></tr>
-</table></div>`;
+    `<div class="rep-scroll" style="margin-top:14px"><table style="table-layout:fixed">
+  <colgroup>
+    <col style="width:90px">
+    <col style="width:auto">
+    <col style="width:90px">
+    <col style="width:105px">
+  </colgroup>
+  <tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th style="text-align:right">Monto</th></tr>
+  ${list.map(g => `<tr>
+    <td style="white-space:nowrap;padding:8px 6px">${fdate(g.fecha)}</td>
+    <td style="padding:8px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(g.descripcion || '-').replace(/"/g, '&quot;')}">${g.descripcion || '-'}</td>
+    <td style="padding:8px 6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${g.categoria}">${g.categoria}</td>
+    <td style="text-align:right;padding:8px 6px;font-weight:600">${fmtGasto(g.monto, g.moneda)}</td>
+  </tr>`).join('')}
+  <tr class="rep-total-row"><td colspan="3">TOTAL (${prefMoneda})</td><td style="text-align:right">${fmt(total)}</td></tr>
+</table></div>
+<div style="margin-top:20px">
+  <div style="font-size:13px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border)">Detalle por Categoría</div>
+  ${detallePorCatHtml}
+</div>`;
 }
 
 function exportarExcel() {
@@ -1811,6 +1873,66 @@ function exportarPDF() {
     footStyles: { fontStyle: 'bold' },
     showFoot: 'lastPage'
   });
+
+  // ── NUEVA PÁGINA: Detalle por categoría (alfabético) ──
+  doc.addPage();
+  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+  doc.text('Detalle por Categoría', 14, 18);
+  doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+  doc.text(`Período: ${label} · Consolidado en ${prefMoneda}`, 14, 26);
+
+  const listSortedAlpha = [...list].sort((a, b) => {
+    const catComp = (a.categoria || '').localeCompare(b.categoria || '', 'es', { sensitivity: 'base' });
+    if (catComp !== 0) return catComp;
+    return (a.fecha || '').localeCompare(b.fecha || '');
+  });
+
+  const symbol = prefMoneda === 'USD' ? 'U$D ' : '$';
+  const catGroups = {};
+  listSortedAlpha.forEach(g => {
+    if (!catGroups[g.categoria]) catGroups[g.categoria] = [];
+    catGroups[g.categoria].push(g);
+  });
+
+  const catDetBody = [];
+  Object.keys(catGroups).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' })).forEach(cat => {
+    const gastosCat = catGroups[cat];
+    const subtotalARS = gastosCat.reduce((s, g) => s + getMontoARS(g), 0);
+    const subtotalConsolidado = prefMoneda === 'USD' ? (subtotalARS / dolarHoy) : subtotalARS;
+    // Fila de cabecera de categoría
+    catDetBody.push([{ content: cat, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], textColor: [30, 30, 30] } }]);
+    // Filas de gastos
+    gastosCat.forEach(g => {
+      const mConsolidado = prefMoneda === 'USD' ? (getMontoARS(g) / dolarHoy) : getMontoARS(g);
+      catDetBody.push([
+        fdate(g.fecha),
+        g.descripcion || '-',
+        g.persona,
+        symbol + mConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ]);
+    });
+    // Fila de subtotal
+    catDetBody.push([
+      '', '',
+      { content: `Subtotal ${cat}`, styles: { fontStyle: 'bold' } },
+      { content: symbol + subtotalConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), styles: { fontStyle: 'bold' } }
+    ]);
+    // Fila vacía como separador
+    catDetBody.push([{ content: '', colSpan: 4, styles: { minCellHeight: 3, fillColor: [255, 255, 255] } }]);
+  });
+
+  doc.autoTable({
+    head: [['Fecha', 'Descripción', 'Persona', `Monto (${prefMoneda})`]],
+    body: catDetBody,
+    startY: 32,
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [26, 26, 24] },
+    foot: [['', '', 'TOTAL GENERAL', symbol + tConsolidado.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]],
+    footStyles: { fontStyle: 'bold', fillColor: [26, 26, 24], textColor: [255, 255, 255] },
+    showFoot: 'lastPage'
+  });
+  // ───────────────────────────────────────────────────────
+
   doc.save(`Gastos_${label.replace(/\//g, '-').replace(/ /g, '_')}.pdf`);
   showToast('PDF exportado ✓');
 }
