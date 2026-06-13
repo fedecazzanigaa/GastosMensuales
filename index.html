@@ -249,14 +249,14 @@
       <div class="card">
         <div class="fg"><label>Período</label>
           <select id="r-tipo" onchange="togglePeriodo()">
+            <option value="per">Mes Personalizado</option>
             <option value="mes">Mes completo</option>
-            <option value="per">Período personalizado</option>
           </select>
         </div>
-        <div id="rg-mes">
+        <div id="rg-mes" style="display:none">
           <div class="fg"><label>Mes</label><input type="month" id="r-mes"></div>
         </div>
-        <div id="rg-per" style="display:none">
+        <div id="rg-per">
           <div class="form-2">
             <div class="fg"><label>Desde</label><input type="date" id="r-desde"></div>
             <div class="fg"><label>Hasta</label><input type="date" id="r-hasta"></div>

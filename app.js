@@ -2404,9 +2404,9 @@ function renderMetrics() {
         borderWidth: 3,
         pointRadius: 2,
         pointHoverRadius: 4,
-        borderDash: (ctx) => ctx.index === (datasets[0].labels.length - 1) ? [5, 5] : [], // Punteado para el ultimo punto (proyeccion)
+        borderDash: (ctx) => ctx.index >= (datasets[0].labels.length - 2) ? [5, 5] : [], // Punteado para las proyecciones
         segment: {
-          borderDash: (ctx) => ctx.p0DataIndex === (datasets[0].labels.length - 2) ? [5, 5] : []
+          borderDash: (ctx) => ctx.p0DataIndex >= (datasets[0].labels.length - 3) ? [5, 5] : []
         }
       }))
     },
@@ -2491,26 +2491,30 @@ function getEvolutionDataByCategory(cats, months) {
   const labels = [];
   const ymKeys = []; // YYYY-MM para filtrar fechas en DB
   
-  // Etiquetas: meses anteriores + proyección
-  for (let i = months; i >= 1; i--) {
+  // Etiquetas: meses anteriores (2)
+  for (let i = 2; i >= 1; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     labels.push(`${MESES_SHORT[d.getMonth()]} ${d.getFullYear()}`);
     ymKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
-  // Mes actual
+  // Mes actual (1)
   labels.push(`${MESES_SHORT[now.getMonth()]} ${now.getFullYear()}`);
   ymKeys.push(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-  // Mes proyección
-  const projDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  labels.push(`${MESES_SHORT[projDate.getMonth()]} ${projDate.getFullYear()} (Proy.)`);
-  ymKeys.push(null); // placeholder, no se usa para filtrar
+  
+  // Meses proyección (2)
+  for (let i = 1; i <= 2; i++) {
+    const projDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    labels.push(`${MESES_SHORT[projDate.getMonth()]} ${projDate.getFullYear()} (Proy.)`);
+    ymKeys.push(null); // placeholder
+  }
 
   cats.forEach(catName => {
     const values = [];
     const cInfo = categorias.find(c => c.nombre === catName) || { color: '#888' };
     
-    // Valores reales (excluye el último que es proyección)
-    for (let i = 0; i < ymKeys.length - 1; i++) {
+    // Valores reales (excluye las 2 proyecciones)
+    const numRealMonths = 3; // 2 pasados + 1 actual
+    for (let i = 0; i < numRealMonths; i++) {
       const ym = ymKeys[i];
       const total = allGastos
         .filter(g => g.categoria === catName && g.fecha && g.fecha.startsWith(ym))
@@ -2524,7 +2528,8 @@ function getEvolutionDataByCategory(cats, months) {
     
     // Proyección: promedio de los meses reales mostrados
     const avg = values.reduce((s, v) => s + v, 0) / (values.length);
-    values.push(avg);
+    values.push(avg); // Proy 1
+    values.push(avg); // Proy 2
     
     datasets.push({
       label: catName,
@@ -3014,5 +3019,14 @@ async function deleteMeta(id) {
 // ─── START ───────────────────────────────────────────────────────────────────
 
 const now = new Date();
-document.getElementById('r-mes') && (document.getElementById('r-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+if (document.getElementById('r-mes')) {
+  document.getElementById('r-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+if (document.getElementById('r-desde') && document.getElementById('r-hasta')) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+  document.getElementById('r-desde').value = `${y}-${m}-01`;
+  document.getElementById('r-hasta').value = `${y}-${m}-${String(lastDay).padStart(2, '0')}`;
+}
 init();
