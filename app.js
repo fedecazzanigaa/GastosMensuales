@@ -624,7 +624,8 @@ function renderDashDeudas() {
     });
     el.innerHTML = '<div class="card-title">Cuotas este mes</div>' +
       tarjetas.filter(t => porTarjeta[t] && (porTarjeta[t].ars > 0 || porTarjeta[t].usd > 0)).map(t => {
-        const color = TARJETA_COLORS[t] || '#666';
+        const cfg = tarjetasCfg ? tarjetasCfg.find(c => c.tarjeta === t) : null;
+        const color = (cfg && cfg.color) ? cfg.color : (TARJETA_COLORS[t] || '#666');
         let montos = [];
         if (porTarjeta[t].ars > 0) montos.push('$'+porTarjeta[t].ars.toLocaleString('es-AR',{minimumFractionDigits:2}));
         if (porTarjeta[t].usd > 0) montos.push('U$D '+porTarjeta[t].usd.toLocaleString('es-AR',{minimumFractionDigits:2}));
@@ -2005,7 +2006,8 @@ function renderConfig() {
   const tarjetas = getTarjetas();
   document.getElementById('cfg-tarjetas').innerHTML = tarjetas.map(t => {
     const cfg = tarjetasCfg.find(c => c.tarjeta === t) || { dia_cierre: 15 };
-    const color = TARJETA_COLORS[t] || '#666';
+    const color = cfg.color || TARJETA_COLORS[t] || '#666';
+    const isDefault = ['Visa', 'Mastercard', 'Amex'].includes(t);
     return `<div class="cat-cfg-item">
       <span class="tarjeta-badge" style="background:${color};color:white;width:80px;justify-content:center">${t}</span>
       <div style="flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end">
@@ -2014,6 +2016,7 @@ function renderConfig() {
           onchange="saveTarjetaConfig('${t}', this.value)" 
           style="width:50px;padding:4px;font-size:12px;text-align:center">
       </div>
+      ${!isDefault ? `<button class="btn btn-danger btn-sm" onclick="deleteTarjeta('${t}')">🗑</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -2051,6 +2054,57 @@ async function updateCategoriaPpto(id, ppto) {
   }
 }
 
+async function addTarjeta() {
+  const nombre = document.getElementById('new-tarjeta').value.trim();
+  const cierre = parseInt(document.getElementById('new-tarjeta-cierre').value) || 15;
+  const color = document.getElementById('new-tarjeta-color').value;
+
+  if (!nombre) { showToast('Escribí el nombre de la tarjeta', 'err'); return; }
+  
+  try {
+    const payload = {
+      tarjeta: nombre,
+      dia_cierre: cierre,
+      color: color,
+      user_id: currentUser.id
+    };
+    
+    const { error } = await sbWithTimeout(() => sb.from('tarjetas_config').upsert(payload, { onConflict: 'tarjeta' }));
+    
+    if (error) {
+      if (error.message && error.message.includes('column "color"')) {
+        showToast('Debes crear la columna "color" (tipo text) en la tabla tarjetas_config en Supabase', 'err');
+      } else {
+        throw error;
+      }
+      return;
+    }
+    
+    await loadTarjetasConfig();
+    document.getElementById('new-tarjeta').value = '';
+    document.getElementById('new-tarjeta-cierre').value = '';
+    renderConfig();
+    renderDeudas();
+    showToast('Tarjeta agregada ✓');
+  } catch (error) {
+    showToast('Error al guardar: ' + error.message, 'err');
+  }
+}
+
+async function deleteTarjeta(nombre) {
+  if (!confirm(`¿Eliminar la tarjeta ${nombre}?`)) return;
+  try {
+    const { error } = await sbWithTimeout(() => sb.from('tarjetas_config').delete().eq('tarjeta', nombre));
+    if (error) throw error;
+    await loadTarjetasConfig();
+    renderConfig();
+    renderDeudas();
+    showToast('Tarjeta eliminada ✓');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
+}
+
 // ─── DEUDAS ──────────────────────────────────────────────────────────────────
 let allDeudas = [];
 const TARJETA_COLORS = { Visa:'#1a1f71', Mastercard:'#eb001b', Amex:'#2e77bc' };
@@ -2081,6 +2135,8 @@ function showFormDeuda() {
   document.getElementById('d-persona').innerHTML = ordenados.map((u, i) =>
     `<option value="${u.name}">${u.name}${i === 0 ? ' (yo)' : ''}</option>`
   ).join('');
+  const tarjetas = getTarjetas();
+  document.getElementById('d-tarjeta').innerHTML = tarjetas.map(t => `<option value="${t}">${t}</option>`).join('');
   document.getElementById('deu-form').style.display = 'block';
   document.getElementById('deu-form').scrollIntoView({ behavior:'smooth' });
 }

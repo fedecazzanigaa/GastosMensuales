@@ -416,7 +416,17 @@
       <div class="section-lbl">Configuración de Tarjetas</div>
       <div class="card">
         <div id="cfg-tarjetas"></div>
-        <p style="font-size:11px;color:var(--text3);margin-top:10px">Establece el día de cierre para que la app calcule tus consumos próximos.</p>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px;margin-bottom:10px">Establece el día de cierre para que la app calcule tus consumos próximos.</p>
+        <div class="add-cat-row" style="flex-direction:column;align-items:stretch;border-top:1px solid var(--border);padding-top:10px">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="new-tarjeta" placeholder="Nombre de Tarjeta..." style="flex:2">
+            <input type="color" class="color-pick" id="new-tarjeta-color" value="#2e77bc">
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input type="number" id="new-tarjeta-cierre" placeholder="Día de cierre (ej: 15)" min="1" max="31" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="addTarjeta()" style="width:42px">+</button>
+          </div>
+        </div>
       </div>
 
       <div class="section-lbl">Mi cuenta</div>
