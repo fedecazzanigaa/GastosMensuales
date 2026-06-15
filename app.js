@@ -607,18 +607,24 @@ function renderDashDeudas() {
   const el = document.getElementById('dash-deudas');
   if (el) {
     el.style.display = 'block';
-    const tarjetas = ['Visa','Mastercard','Amex'];
+    const tarjetas = getTarjetas();
     const porTarjeta = {};
     tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0 }; });
     activas.forEach(d => {
       if (porTarjeta[d.tarjeta]) {
         if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
         else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+      } else {
+        // If the card is not in the list, dynamically add it
+        porTarjeta[d.tarjeta] = { ars:0, usd:0 };
+        if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd = parseFloat(d.monto_cuota||0);
+        else porTarjeta[d.tarjeta].ars = parseFloat(d.monto_cuota||0);
+        if(!tarjetas.includes(d.tarjeta)) tarjetas.push(d.tarjeta);
       }
     });
     el.innerHTML = '<div class="card-title">Cuotas este mes</div>' +
-      tarjetas.filter(t => porTarjeta[t].ars > 0 || porTarjeta[t].usd > 0).map(t => {
-        const color = TARJETA_COLORS[t];
+      tarjetas.filter(t => porTarjeta[t] && (porTarjeta[t].ars > 0 || porTarjeta[t].usd > 0)).map(t => {
+        const color = TARJETA_COLORS[t] || '#666';
         let montos = [];
         if (porTarjeta[t].ars > 0) montos.push('$'+porTarjeta[t].ars.toLocaleString('es-AR',{minimumFractionDigits:2}));
         if (porTarjeta[t].usd > 0) montos.push('U$D '+porTarjeta[t].usd.toLocaleString('es-AR',{minimumFractionDigits:2}));
@@ -1996,11 +2002,12 @@ function renderConfig() {
 </div>`
   ).join('');
 
-  const tarjetas = ['Visa', 'Mastercard', 'Amex'];
+  const tarjetas = getTarjetas();
   document.getElementById('cfg-tarjetas').innerHTML = tarjetas.map(t => {
     const cfg = tarjetasCfg.find(c => c.tarjeta === t) || { dia_cierre: 15 };
+    const color = TARJETA_COLORS[t] || '#666';
     return `<div class="cat-cfg-item">
-      <span class="tarjeta-badge" style="background:${TARJETA_COLORS[t]};color:white;width:80px;justify-content:center">${t}</span>
+      <span class="tarjeta-badge" style="background:${color};color:white;width:80px;justify-content:center">${t}</span>
       <div style="flex:1;display:flex;align-items:center;gap:8px;justify-content:flex-end">
         <span style="font-size:12px">Cierra día:</span>
         <input type="number" value="${cfg.dia_cierre}" min="1" max="31" 
@@ -2049,6 +2056,12 @@ let allDeudas = [];
 const TARJETA_COLORS = { Visa:'#1a1f71', Mastercard:'#eb001b', Amex:'#2e77bc' };
 const TARJETA_EMOJIS = { Visa:'💳', Mastercard:'💳', Amex:'💎' };
 const MESES_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function getTarjetas() {
+  const custom = tarjetasCfg.map(c => c.tarjeta);
+  const activas = allDeudas ? allDeudas.map(d => d.tarjeta) : [];
+  return [...new Set(['Visa', 'Mastercard', 'Amex', ...custom, ...activas])].filter(Boolean);
+}
 
 async function loadDeudas() {
   const { data, error } = await sb.from('deudas').select('*').order('created_at', { ascending: false });
@@ -2252,7 +2265,7 @@ function renderDeudas() {
   const terminadas = allDeudas.filter(d => (d.cuotas_pagas||0) >= (d.cuotas_total||1));
 
   // ── Resumen por tarjeta ──
-  const tarjetas = ['Visa','Mastercard','Amex'];
+  const tarjetas = getTarjetas();
   const resDiv = document.getElementById('deu-resumen');
   const porTarjeta = {};
   tarjetas.forEach(t => { porTarjeta[t] = { ars:0, usd:0, count:0 }; });
@@ -2261,9 +2274,14 @@ function renderDeudas() {
       porTarjeta[d.tarjeta].count++;
       if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd += parseFloat(d.monto_cuota||0);
       else porTarjeta[d.tarjeta].ars += parseFloat(d.monto_cuota||0);
+    } else {
+      porTarjeta[d.tarjeta] = { ars:0, usd:0, count:1 };
+      if (d.moneda === 'USD') porTarjeta[d.tarjeta].usd = parseFloat(d.monto_cuota||0);
+      else porTarjeta[d.tarjeta].ars = parseFloat(d.monto_cuota||0);
+      if(!tarjetas.includes(d.tarjeta)) tarjetas.push(d.tarjeta);
     }
   });
-  const tarjetasConDeuda = tarjetas.filter(t => porTarjeta[t].count > 0);
+  const tarjetasConDeuda = tarjetas.filter(t => porTarjeta[t] && porTarjeta[t].count > 0);
   if (tarjetasConDeuda.length === 0) {
     resDiv.innerHTML = '<div class="empty" style="padding:1rem 0"><div class="empty-icon">💳</div>Sin deudas activas</div>';
   } else {
