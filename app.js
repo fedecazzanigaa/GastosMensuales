@@ -2344,13 +2344,14 @@ function renderDeudas() {
     resDiv.innerHTML = '<div class="card" style="margin-bottom:10px"><div class="card-title">Cuota mensual por tarjeta</div>' +
       tarjetasConDeuda.map(t => {
         const info = porTarjeta[t];
-        const color = TARJETA_COLORS[t];
+        const cfg = tarjetasCfg.find(c => c.tarjeta === t);
+        const color = (cfg && cfg.color) ? cfg.color : (TARJETA_COLORS[t] || '#666');
         let montos = [];
         if (info.ars > 0) montos.push('<strong>$'+info.ars.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
         if (info.usd > 0) montos.push('<strong>U$D '+info.usd.toLocaleString('es-AR',{minimumFractionDigits:2})+'</strong>');
         return `<div class="resumen-tarjeta">
           <span style="display:flex;align-items:center;gap:8px">
-            <span class="tarjeta-badge" style="background:${color};color:white">${t}</span>
+            <span class="tarjeta-badge" style="background:${color};color:white;width:90px;justify-content:center">${t}</span>
             <span style="font-size:12px;color:var(--text2)">${info.count} compra${info.count>1?'s':''}</span>
           </span>
           <span style="font-size:14px">${montos.join(' + ')}/mes</span>
@@ -2392,7 +2393,8 @@ function renderDeudas() {
     const total = d.cuotas_total || 1;
     const pct = Math.round(pagas/total*100);
     const terminada = pagas >= total;
-    const color = TARJETA_COLORS[d.tarjeta] || '#888';
+    const cfg = tarjetasCfg.find(c => c.tarjeta === d.tarjeta);
+    const color = (cfg && cfg.color) ? cfg.color : (TARJETA_COLORS[d.tarjeta] || '#888');
     const [y,m] = (d.mes_inicio||'').split('-');
     const inicioLabel = m && y ? `${MESES_SHORT[parseInt(m)-1]} ${y}` : '';
     const venc = getProxVencimiento(d.tarjeta);
