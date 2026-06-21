@@ -251,6 +251,7 @@
           <select id="r-tipo" onchange="togglePeriodo()">
             <option value="per">Mes Personalizado</option>
             <option value="mes">Mes completo</option>
+            <option value="comp">Comparativa (Mes vs Mes)</option>
           </select>
         </div>
         <div id="rg-mes" style="display:none">
@@ -261,6 +262,34 @@
             <div class="fg"><label>Desde</label><input type="date" id="r-desde"></div>
             <div class="fg"><label>Hasta</label><input type="date" id="r-hasta"></div>
           </div>
+        </div>
+          <div class="row" id="rg-comp" style="display:none; gap:10px;">
+            <div class="fg" style="flex:1">
+              <label>MES 1</label>
+              <input type="month" id="r-mes1">
+            </div>
+            <div class="fg" style="flex:1">
+              <label>MES 2</label>
+              <input type="month" id="r-mes2">
+            </div>
+          </div>
+        <div class="fg" style="margin-top:4px">
+          <label>Categorías</label>
+          <div class="ms-wrap">
+            <div class="ms-trigger" onclick="toggleMs('ms-rep-cat', event)">
+              <span id="ms-rep-cat-label">Todas</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+            </div>
+            <div class="ms-dropdown" id="ms-rep-cat" style="display:none"></div>
+          </div>
+        </div>
+        <div style="display:flex; gap:16px; margin-bottom:12px; margin-top:-4px">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text2); cursor:pointer;">
+            <input type="checkbox" id="r-inc-fijos" checked style="width:16px; height:16px; accent-color:var(--primary)"> Incluir Fijos
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text2); cursor:pointer;">
+            <input type="checkbox" id="r-inc-cuotas" checked style="width:16px; height:16px; accent-color:var(--primary)"> Incluir Cuotas
+          </label>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
           <button class="btn btn-sm" style="flex:1" onclick="previewReporte()">
@@ -285,6 +314,10 @@
             </svg>
             PDF
           </button>
+        </div>
+        <div id="rep-highlights" class="metrics" style="display:none; margin-top:10px;"></div>
+        <div class="chart-container" id="rep-chart-container" style="display:none; height:160px; margin-top:10px; margin-bottom:16px;">
+          <canvas id="repChart"></canvas>
         </div>
         <div id="rep-preview"></div>
       </div>

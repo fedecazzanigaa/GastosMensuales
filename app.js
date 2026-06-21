@@ -593,6 +593,7 @@ function switchTab(t) {
   if (t === 'rec') renderRecurrentes();
   if (t === 'met') renderMetrics();
   if (t === 'cfg') renderConfig();
+  if (t === 'rep') initRep();
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
@@ -1617,62 +1618,280 @@ async function deleteGasto(id) {
 }
 
 // ─── REPORTES ────────────────────────────────────────────────────────────────
+let msRepCatSel = new Set();
+
+function initRep() {
+  const now = new Date();
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const prevMonth = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+  
+  if (!document.getElementById('r-mes').value) document.getElementById('r-mes').value = defaultMonth;
+  if (!document.getElementById('r-mes1').value) document.getElementById('r-mes1').value = prevMonth;
+  if (!document.getElementById('r-mes2').value) document.getElementById('r-mes2').value = defaultMonth;
+
+  buildMsRepCat();
+}
+
+function buildMsRepCat() {
+  const items = categorias.slice().sort((a,b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })).map(c => c.nombre);
+  const el = document.getElementById('ms-rep-cat');
+  el.innerHTML =
+    `<div class="ms-item" onclick="msRepCatToggle('__all__')">
+      <div class="ms-check ${msRepCatSel.size === 0 ? 'on' : ''}"></div>
+      <span style="font-weight:600">Todas</span>
+    </div>` +
+    items.map(item =>
+      `<div class="ms-item" onclick="msRepCatToggle('${item}');event.stopPropagation()">
+        <div class="ms-check ${msRepCatSel.has(item) ? 'on' : ''}"></div>
+        <span>${item}</span>
+      </div>`
+    ).join('');
+  const lbl = document.getElementById('ms-rep-cat-label');
+  if (msRepCatSel.size === 0) lbl.textContent = 'Todas';
+  else if (msRepCatSel.size === 1) lbl.textContent = [...msRepCatSel][0];
+  else lbl.textContent = `${msRepCatSel.size} categorías`;
+}
+
+function msRepCatToggle(val, event) {
+  if (event) event.stopPropagation();
+  if (val === '__all__') msRepCatSel.clear();
+  else {
+    if (msRepCatSel.has(val)) msRepCatSel.delete(val);
+    else msRepCatSel.add(val);
+  }
+  buildMsRepCat();
+}
+
 function togglePeriodo() {
   const tipo = document.getElementById('r-tipo').value;
   document.getElementById('rg-mes').style.display = tipo === 'mes' ? '' : 'none';
   document.getElementById('rg-per').style.display = tipo === 'per' ? '' : 'none';
+  document.getElementById('rg-comp').style.display = tipo === 'comp' ? '' : 'none';
 }
 
 function getReporteData() {
   const tipo = document.getElementById('r-tipo').value;
+  
+  const incFijos = document.getElementById('r-inc-fijos')?.checked;
+  const incCuotas = document.getElementById('r-inc-cuotas')?.checked;
+  
+  const aplicarFiltros = (lista) => {
+    return lista.filter(g => {
+      if (msRepCatSel.size > 0 && !msRepCatSel.has(g.categoria)) return false;
+      const isFijo = g.notas && (g.notas.includes('Carga automática') || g.notas.includes('Fijo'));
+      const isCuota = g.categoria === 'Deudas' || (g.notas && g.notas.includes('Pago de cuota de'));
+      if (!incFijos && isFijo) return false;
+      if (!incCuotas && isCuota) return false;
+      return true;
+    }).sort((a, b) => {
+      const dateComp = (b.fecha || '').localeCompare(a.fecha || '');
+      if (dateComp !== 0) return dateComp;
+      return (a.categoria || '').localeCompare(b.categoria || '');
+    });
+  };
+
   if (tipo === 'mes') {
     const mes = document.getElementById('r-mes').value;
     if (!mes) { showToast('Seleccioná un mes', 'err'); return null; }
     const [y, m] = mes.split('-');
     return { 
-      list: allGastos
-        .filter(g => g.fecha && g.fecha.startsWith(mes))
-        .sort((a, b) => {
-          const dateComp = b.fecha.localeCompare(a.fecha);
-          if (dateComp !== 0) return dateComp;
-          return a.categoria.localeCompare(b.categoria);
-        }), 
-      label: `${MESES[parseInt(m) - 1]} ${y}` 
+      list: aplicarFiltros(allGastos.filter(g => g.fecha && g.fecha.startsWith(mes))), 
+      label: `${MESES[parseInt(m) - 1]} ${y}`,
+      tipo: 'mes'
     };
-  } else {
+  } else if (tipo === 'per') {
     const desde = document.getElementById('r-desde').value, hasta = document.getElementById('r-hasta').value;
     if (!desde || !hasta) { showToast('Seleccioná fechas', 'err'); return null; }
     return { 
-      list: allGastos
-        .filter(g => g.fecha >= desde && g.fecha <= hasta)
-        .sort((a, b) => {
-          const dateComp = b.fecha.localeCompare(a.fecha);
-          if (dateComp !== 0) return dateComp;
-          return a.categoria.localeCompare(b.categoria);
-        }), 
-      label: `${fdate(desde)} al ${fdate(hasta)}` 
+      list: aplicarFiltros(allGastos.filter(g => g.fecha >= desde && g.fecha <= hasta)), 
+      label: `${fdate(desde)} al ${fdate(hasta)}`,
+      tipo: 'per'
+    };
+  } else if (tipo === 'comp') {
+    const mes1 = document.getElementById('r-mes1').value;
+    const mes2 = document.getElementById('r-mes2').value;
+    if (!mes1 || !mes2) { showToast('Seleccioná ambos meses', 'err'); return null; }
+    const [y1, m1] = mes1.split('-');
+    const [y2, m2] = mes2.split('-');
+    return {
+      list1: aplicarFiltros(allGastos.filter(g => g.fecha && g.fecha.startsWith(mes1))),
+      label1: `${MESES[parseInt(m1) - 1]} ${y1}`,
+      list2: aplicarFiltros(allGastos.filter(g => g.fecha && g.fecha.startsWith(mes2))),
+      label2: `${MESES[parseInt(m2) - 1]} ${y2}`,
+      tipo: 'comp'
     };
   }
 }
 
 function previewReporte() {
   const r = getReporteData(); if (!r) return;
-  const { list, label } = r;
   const div = document.getElementById('rep-preview');
-  if (!list.length) { div.innerHTML = '<div class="empty">Sin datos para el período</div>'; return; }
+  const highlightsDiv = document.getElementById('rep-highlights');
+  const chartContainer = document.getElementById('rep-chart-container');
   
   const getMontoARS = (g) => {
     const m = parseFloat(g.monto || 0);
     return g.moneda === 'USD' ? m * dolarHoy : m;
   };
 
+  if (r.tipo === 'comp') {
+    const { list1, label1, list2, label2 } = r;
+    highlightsDiv.style.display = 'none';
+    chartContainer.style.display = 'none';
+    
+    if (!list1.length && !list2.length) { div.innerHTML = '<div class="empty">Sin datos para los períodos seleccionados</div>'; return; }
+    
+    const total1 = list1.reduce((s, g) => s + getMontoARS(g), 0);
+    const total2 = list2.reduce((s, g) => s + getMontoARS(g), 0);
+    
+    const catMap = {};
+    list1.forEach(g => { catMap[g.categoria] = catMap[g.categoria] || { m1: 0, m2: 0 }; catMap[g.categoria].m1 += getMontoARS(g); });
+    list2.forEach(g => { catMap[g.categoria] = catMap[g.categoria] || { m1: 0, m2: 0 }; catMap[g.categoria].m2 += getMontoARS(g); });
+    
+    const difTotal = total2 - total1;
+    const difTotalPct = total1 ? (difTotal / total1) * 100 : 0;
+    const difColor = difTotal > 0 ? 'var(--red)' : 'var(--green)';
+    const difIcon = difTotal > 0 ? '↑' : (difTotal < 0 ? '↓' : '=');
+
+    let html = `<div style="text-align:center; padding:12px; background:var(--bg2); border-radius:8px; margin-bottom:16px;">
+      <div style="font-size:12px; color:var(--text2)">Diferencia Total</div>
+      <div style="font-size:24px; font-weight:bold; color:${difColor}">${difIcon} ${fmt(Math.abs(difTotal))} <span style="font-size:14px">(${Math.abs(difTotalPct).toFixed(1)}%)</span></div>
+      <div style="font-size:12px; color:var(--text3); margin-top:4px">${label2} respecto a ${label1}</div>
+    </div>`;
+
+    html += `<table style="width:100%; table-layout:fixed; font-size:12px; text-align:right">
+      <colgroup><col style="width:auto; text-align:left"><col style="width:24%"><col style="width:24%"><col style="width:27%"></colgroup>
+      <tr style="color:var(--text2); font-size:10px"><th style="text-align:left; padding-bottom:8px">Categoría</th><th>${label1}</th><th>${label2}</th><th>Variación</th></tr>`;
+
+    Object.keys(catMap).sort((a, b) => a.localeCompare(b)).forEach(c => {
+      const { m1, m2 } = catMap[c];
+      const dif = m2 - m1;
+      const difPct = m1 ? (dif / m1) * 100 : 0;
+      const color = dif > 0 ? 'var(--red)' : (dif < 0 ? 'var(--green)' : 'var(--text3)');
+      html += `<tr>
+        <td style="text-align:left; padding:8px 0; border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${catColor(c)};display:inline-block;flex-shrink:0"></span><span style="overflow:hidden;text-overflow:ellipsis">${c}</span></span>
+        </td>
+        <td style="padding:8px 0; border-bottom:1px solid var(--border); white-space:nowrap">${fmt(m1)}</td>
+        <td style="padding:8px 0; border-bottom:1px solid var(--border); white-space:nowrap">${fmt(m2)}</td>
+        <td style="padding:8px 0; border-bottom:1px solid var(--border); color:${color}; font-size:11px; white-space:nowrap">${dif > 0 ? '+' : ''}${fmt(dif)} <span style="font-size:10px">(${difPct > 0 ? '+' : ''}${difPct.toFixed(0)}%)</span></td>
+      </tr>`;
+    });
+    
+    html += `<tr style="font-weight:bold; font-size:12px">
+      <td style="text-align:left; padding:12px 0">TOTAL</td>
+      <td style="padding:12px 0; white-space:nowrap">${fmt(total1)}</td>
+      <td style="padding:12px 0; white-space:nowrap">${fmt(total2)}</td>
+      <td style="padding:12px 0; color:${difColor}; white-space:nowrap">${difIcon} ${Math.abs(difTotalPct).toFixed(1)}%</td>
+    </tr></table>`;
+    
+    div.innerHTML = html;
+    return;
+  }
+
+  // --- Normal / Mes ---
+  const { list, label } = r;
+  if (!list.length) { 
+    div.innerHTML = '<div class="empty">Sin datos para el período</div>'; 
+    highlightsDiv.style.display = 'none';
+    chartContainer.style.display = 'none';
+    return; 
+  }
+  
   const total = list.reduce((s, g) => s + getMontoARS(g), 0);
   const catMap = {};
   list.forEach(g => { 
     const montoARS = getMontoARS(g);
     catMap[g.categoria] = (catMap[g.categoria] || 0) + montoARS; 
   });
-  // Agrupar y ordenar por categoría (alfabético)
+  
+  // Calcular Highlights
+  let dias = 1;
+  if (r.tipo === 'mes') {
+    const mesArr = document.getElementById('r-mes').value.split('-');
+    dias = new Date(mesArr[0], mesArr[1], 0).getDate();
+  } else {
+    const d1 = new Date(document.getElementById('r-desde').value);
+    const d2 = new Date(document.getElementById('r-hasta').value);
+    dias = Math.max(1, Math.round((d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+  }
+  const avgDia = total / dias;
+  
+  let maxGasto = list[0];
+  list.forEach(g => { if (getMontoARS(g) > getMontoARS(maxGasto)) maxGasto = g; });
+  
+  let topCat = ''; let topCatMax = 0;
+  Object.keys(catMap).forEach(c => { if(catMap[c] > topCatMax) { topCatMax = catMap[c]; topCat = c; } });
+
+  highlightsDiv.style.display = 'block';
+  highlightsDiv.innerHTML = `
+    <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg2);border-bottom:1px solid var(--border)">
+        <span style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px">
+          <span style="width:10px;height:10px;border-radius:50%;background:var(--primary);display:inline-block"></span>Resumen del Período
+        </span>
+        <span style="font-weight:700;font-size:14px;color:var(--text)">${fmt(total)}</span>
+      </div>
+      <div style="padding:0">
+        <table style="width:100%;table-layout:fixed;font-size:13px">
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px;color:var(--text2)">Promedio Diario</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:500">${fmt(avgDia)}</td>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px;color:var(--text2)">Mayor Gasto</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:500" title="${maxGasto ? (maxGasto.descripcion || maxGasto.categoria) : ''}">${maxGasto ? (maxGasto.descripcion || maxGasto.categoria).substring(0, 25) : '-'}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 12px;color:var(--text2)">Categoría Principal</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:500;color:${catColor(topCat)}">${topCat}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // Chart
+  chartContainer.style.display = 'block';
+  const ctx = document.getElementById('repChart').getContext('2d');
+  if (window.repChartInstance) window.repChartInstance.destroy();
+  
+  const chartCats = Object.keys(catMap).sort((a,b) => catMap[b] - catMap[a]);
+  const chartData = chartCats.map(c => catMap[c]);
+  const chartColors = chartCats.map(c => catColor(c));
+  
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  window.repChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: chartCats,
+      datasets: [{ 
+        data: chartData, 
+        backgroundColor: chartColors, 
+        borderWidth: isDark ? 2 : 1,
+        borderColor: isDark ? '#1a1a18' : '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { 
+          position: 'right', 
+          labels: { 
+            color: isDark ? '#e1e1df' : '#1a1a18', 
+            font: {size: 11}, 
+            boxWidth: 12 
+          } 
+        },
+        tooltip: {
+          callbacks: { label: (ctx) => ` ${ctx.label}: ${fmt(ctx.raw)}` }
+        }
+      },
+      cutout: '70%'
+    }
+  });
+
   const catGroups = {};
   list.forEach(g => {
     if (!catGroups[g.categoria]) catGroups[g.categoria] = { total: 0, gastos: [] };
@@ -1720,11 +1939,6 @@ function previewReporte() {
   }).join('');
 
   div.innerHTML = `<div class="rep-total"><span>${label} · ${list.length} gastos</span><span>${fmt(total)}</span></div>` +
-    Object.entries(catMap).sort((a, b) => b[1] - a[1]).map(([c, v]) => `
-  <div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--border)">
-    <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:${catColor(c)};display:inline-block"></span>${c}</span>
-    <span style="font-weight:600">${fmt(v)}</span>
-  </div>`).join('') +
     `<div class="rep-scroll" style="margin-top:14px"><table style="table-layout:fixed">
   <colgroup>
     <col style="width:90px">
@@ -1749,6 +1963,12 @@ function previewReporte() {
 
 function exportarExcel() {
   const r = getReporteData(); if (!r) return;
+  
+  if (r.tipo === 'comp') {
+    showToast('La exportación de Comparativas a Excel se implementará pronto.', 'info');
+    return;
+  }
+  
   const { list, label } = r;
   if (!list.length) { showToast('Sin datos', 'err'); return; }
   const wb = XLSX.utils.book_new();
@@ -1829,6 +2049,12 @@ function exportarExcel() {
 
 function exportarPDF() {
   const r = getReporteData(); if (!r) return;
+  
+  if (r.tipo === 'comp') {
+    showToast('La exportación de Comparativas a PDF se implementará pronto.', 'info');
+    return;
+  }
+
   const { list, label } = r;
   if (!list.length) { showToast('Sin datos', 'err'); return; }
   const { jsPDF } = window.jspdf;
