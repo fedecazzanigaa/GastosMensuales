@@ -779,8 +779,8 @@ function renderDash() {
     ? recent.map(g => `<div class="tx-item">
     <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
     <div class="tx-info">
-      <div class="tx-desc">${g.descripcion || g.categoria}</div>
-      <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}</div>
+      <div class="tx-desc">${formatTags(g.descripcion || g.categoria)}</div>
+      <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${formatTags(g.notas)}</span>` : ''}</div>
     </div>
     <div class="tx-right">
       <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
@@ -1550,6 +1550,20 @@ function initHist() {
   buildMsPer();
 }
 
+function formatTags(text) {
+  if (!text) return '';
+  return text.replace(/#([a-zA-Z0-9áéíóúÁÉÍÓÚñÑ_]+)/g, '<span class="tag-badge" onclick="searchTag(\'$1\', event)">#$1</span>');
+}
+
+function searchTag(tag, event) {
+  if (event) event.stopPropagation();
+  const busq = document.getElementById('h-busq');
+  if (busq) {
+    busq.value = '#' + tag;
+    switchTab('hist');
+    loadHistorial();
+  }
+}
 
 function loadHistorial() {
   document.querySelectorAll('.ms-dropdown').forEach(d => d.style.display = 'none');
@@ -1596,8 +1610,8 @@ function loadHistorial() {
       return `<div class="tx-item" style="flex-wrap:wrap">
         <div class="tx-dot" style="background:${catColor(g.categoria)}33">${catEmoji(g.categoria)}</div>
         <div class="tx-info">
-          <div class="tx-desc">${g.descripcion || g.categoria}</div>
-          <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${g.notas}</span>` : ''}</div>
+          <div class="tx-desc">${formatTags(g.descripcion || g.categoria)}</div>
+          <div class="tx-meta">${g.categoria} · ${personaBadge(g.persona)}${g.notas ? `<br><span style="font-size:10px">${formatTags(g.notas)}</span>` : ''}</div>
         </div>
         <div class="tx-right">
           <div class="tx-amount">${fmtGasto(g.monto, g.moneda)}</div>
