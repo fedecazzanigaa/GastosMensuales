@@ -505,6 +505,34 @@
       </div>
     </div>
 
+    <!-- AHORRO -->
+    <div id="p-aho" class="panel">
+      <div class="metrics" id="aho-summary"></div>
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Ahorros del Mes</span>
+          <button class="btn btn-primary btn-sm" onclick="showFormAhorro()" style="margin:0">+ Nuevo</button>
+        </div>
+        <div id="aho-list"></div>
+      </div>
+      <div class="card" id="aho-form" style="display:none">
+        <div class="card-title">Nuevo Ahorro</div>
+        <div class="fg"><label>Descripción</label><input type="text" id="a-desc" placeholder="Ej: Compra Dólares, Plazo Fijo..."></div>
+        <div class="form-2">
+          <div class="fg"><label>Monto</label><input type="text" id="a-monto" placeholder="0.00" inputmode="decimal" pattern="[0-9.,]*"></div>
+          <div class="fg"><label>Moneda</label>
+            <select id="a-moneda">
+              <option value="ARS">ARS</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg"><label>Fecha</label><input type="date" id="a-fecha"></div>
+        <button class="btn btn-primary" id="a-save-btn" onclick="saveAhorro()">Guardar</button>
+        <button class="btn" onclick="hideFormAhorro()">Cancelar</button>
+      </div>
+    </div>
+
     <!-- METAS DE AHORRO -->
     <div id="p-goals" class="panel">
       <div class="card">
@@ -567,6 +595,14 @@
       <div class="card">
         <div class="card-title">Más opciones</div>
         <div class="mas-grid">
+          <button class="mas-btn" onclick="switchTab('aho')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V19a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-1.5c1 0 2.5.5 4-1.5 1.5 0 2 1.5 2 1.5 2 1.5 2-1.5V9c0-2.2-1.5-4-3-4z"/>
+              <path d="M2 9v1c0 1.1.9 2 2 2h1"/>
+              <path d="M16 11h.01"/>
+            </svg>
+            <span>Ahorro</span>
+          </button>
           <button class="mas-btn" onclick="switchTab('bal')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />

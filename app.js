@@ -178,7 +178,8 @@ async function showApp() {
     loadRecurrentes(),
     loadTarjetasConfig(),
     loadIngresos(),
-    loadGoals()
+    loadGoals(),
+    loadAhorros()
   ]);
   
   document.getElementById('pref-moneda').value = prefMoneda;
@@ -515,6 +516,10 @@ function subscribeRealtime() {
       await loadIngresos();
       renderBalance();
     })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'ahorros' }, async (payload) => {
+      await loadAhorros();
+      renderAhorros();
+    })
     .subscribe();
 }
 
@@ -588,6 +593,7 @@ function switchTab(t) {
   if (t === 'nuevo') initForm();
   if (t === 'hist') { initHist(); loadHistorial(); }
   if (t === 'bal') renderBalance();
+  if (t === 'aho') renderAhorros();
   if (t === 'goals') renderGoals();
   if (t === 'deu') renderDeudas();
   if (t === 'rec') renderRecurrentes();
@@ -1824,17 +1830,26 @@ function previewReporte() {
   let topCat = ''; let topCatMax = 0;
   Object.keys(catMap).forEach(c => { if(catMap[c] > topCatMax) { topCatMax = catMap[c]; topCat = c; } });
 
+  // Calcular Ahorros del período
+  let ahoList = [];
+  if (r.tipo === 'mes') {
+    ahoList = allAhorros.filter(a => a.fecha && a.fecha.startsWith(document.getElementById('r-mes').value));
+  } else {
+    const d1 = document.getElementById('r-desde').value;
+    const d2 = document.getElementById('r-hasta').value;
+    ahoList = allAhorros.filter(a => a.fecha && a.fecha >= d1 && a.fecha <= d2);
+  }
+  const totalAho = ahoList.reduce((s, a) => s + getMontoARS(a), 0);
+
   highlightsDiv.style.display = 'block';
   highlightsDiv.innerHTML = `
     <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg2);border-bottom:1px solid var(--border)">
-        <span style="font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px">
-          <span style="width:10px;height:10px;border-radius:50%;background:var(--primary);display:inline-block"></span>Resumen del Período
-        </span>
-        <span style="font-weight:700;font-size:14px;color:var(--text)">${fmt(total)}</span>
-      </div>
       <div style="padding:0">
         <table style="width:100%;table-layout:fixed;font-size:13px">
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:10px 12px;font-weight:600;font-size:14px;color:var(--text)">Resumen del Período</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:var(--text)">${fmt(total)}</td>
+          </tr>
           <tr style="border-bottom:1px solid var(--border)">
             <td style="padding:10px 12px;color:var(--text2)">Promedio Diario</td>
             <td style="padding:10px 12px;text-align:right;font-weight:500">${fmt(avgDia)}</td>
@@ -1846,6 +1861,17 @@ function previewReporte() {
           <tr>
             <td style="padding:10px 12px;color:var(--text2)">Categoría Principal</td>
             <td style="padding:10px 12px;text-align:right;font-weight:500;color:${catColor(topCat)}">${topCat}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    
+    <div style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <div style="padding:0">
+        <table style="width:100%;table-layout:fixed;font-size:13px">
+          <tr>
+            <td style="padding:10px 12px;font-weight:600;font-size:14px;color:var(--text)">Ahorro del Período</td>
+            <td style="padding:10px 12px;text-align:right;font-weight:700;font-size:14px;color:var(--green)">${fmt(totalAho)}</td>
           </tr>
         </table>
       </div>
@@ -3225,6 +3251,88 @@ async function deleteIngreso(id) {
     await loadIngresos();
     renderBalance();
     showToast('Ingreso eliminado ✓');
+  } catch (error) {
+    showToast('Error al eliminar: ' + error.message, 'err');
+  }
+}
+
+// ─── AHORROS ─────────────────────────────────────────────────────────
+let allAhorros = [];
+
+async function loadAhorros() {
+  const { data } = await sb.from('ahorros').select('*').order('fecha', { ascending: false });
+  if (data) allAhorros = data;
+}
+
+function showFormAhorro() {
+  document.getElementById('aho-form').style.display = 'block';
+  document.getElementById('a-fecha').value = new Date().toISOString().split('T')[0];
+  document.getElementById('a-moneda').value = prefMoneda;
+  document.getElementById('a-desc').value = '';
+  document.getElementById('a-monto').value = '';
+  document.getElementById('a-desc').focus();
+}
+
+function hideFormAhorro() {
+  document.getElementById('aho-form').style.display = 'none';
+}
+
+async function saveAhorro() {
+  const desc = document.getElementById('a-desc').value.trim();
+  const monto = parseInputFloat(document.getElementById('a-monto').value);
+  const moneda = document.getElementById('a-moneda').value;
+  const fecha = document.getElementById('a-fecha').value;
+  if (!desc || isNaN(monto) || !fecha) { showToast('Completá los datos', 'err'); return; }
+  const btn = document.getElementById('a-save-btn');
+  btn.innerHTML = '<span class="spinner"></span>'; btn.classList.add('btn-loading');
+  try {
+    const { error } = await sbWithTimeout(() => sb.from('ahorros').insert([{ descripcion: desc, monto, moneda, fecha, user_id: currentUser.id }]));
+    if (error) throw error;
+    showToast('Ahorro guardado ✓'); 
+    hideFormAhorro(); 
+    await loadAhorros(); 
+    renderAhorros();
+  } catch (error) {
+    showToast('Error: ' + error.message, 'err');
+  } finally {
+    btn.innerHTML = 'Guardar'; btn.classList.remove('btn-loading');
+  }
+}
+
+function renderAhorros() {
+  const ym = `${dashMonth.getFullYear()}-${String(dashMonth.getMonth() + 1).padStart(2, '0')}`;
+  const ahoMes = allAhorros.filter(a => a.fecha && a.fecha.startsWith(ym));
+  const getMontoARS = (val, mon) => mon === 'USD' ? val * dolarHoy : val;
+  const totalAho = ahoMes.reduce((s, a) => s + getMontoARS(a.monto, a.moneda), 0);
+  document.getElementById('aho-summary').innerHTML = `
+    <div class="metric" style="grid-column:1/-1">
+      <div class="metric-label">Total Ahorrado en el Mes</div>
+      <div class="metric-value g">${fmt(totalAho)}</div>
+    </div>`;
+  document.getElementById('aho-list').innerHTML = ahoMes.length 
+    ? ahoMes.map(a => `
+      <div class="tx-item">
+        <div class="tx-dot" style="background:var(--green)22">🏦</div>
+        <div class="tx-info">
+          <div class="tx-desc">${a.descripcion}</div>
+          <div class="tx-meta">${fdate(a.fecha)}</div>
+        </div>
+        <div class="tx-right">
+          <div class="tx-amount" style="color:var(--green)">${fmtGasto(a.monto, a.moneda)}</div>
+          <button class="btn btn-danger btn-sm" onclick="deleteAhorro('${a.id}')" style="margin-top:4px;padding:2px 6px">🗑</button>
+        </div>
+      </div>`).join('')
+    : '<div class="empty">Sin ahorros este mes</div>';
+}
+
+async function deleteAhorro(id) {
+  if (!confirm('¿Eliminar ahorro?')) return;
+  try {
+    const { error } = await sbWithTimeout(() => sb.from('ahorros').delete().eq('id', id));
+    if (error) throw error;
+    await loadAhorros();
+    renderAhorros();
+    showToast('Ahorro eliminado ✓');
   } catch (error) {
     showToast('Error al eliminar: ' + error.message, 'err');
   }
