@@ -2599,6 +2599,18 @@ function getCuotasMes(yearMonth) {
   }, 0);
 }
 
+// Devuelve el total de cuotas pendientes en un mes para una tarjeta específica
+function getCuotasMesForTarjeta(yearMonth, tarjeta) {
+  return allDeudas.reduce((total, d) => {
+    if (d.tarjeta !== tarjeta) return total;
+    if (getCuotaPendienteParaMes(d, yearMonth)) {
+      const montoARS = d.moneda === 'USD' ? d.monto_cuota * dolarHoy : d.monto_cuota;
+      return total + parseFloat(montoARS || 0);
+    }
+    return total;
+  }, 0);
+}
+
 
 
 function getProxVencimiento(tarjeta) {
@@ -2675,20 +2687,27 @@ function renderDeudas() {
   if (activas.length > 0) {
     grafCard.style.display = 'block';
     const now = new Date();
-    const mesesData = [];
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
-      const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      const totalARS = getCuotasMes(ym);
-      const total = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
-      const label = `${MESES_SHORT[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`;
-      mesesData.push({ label, value: total });
-    }
+    // Construir una serie por tarjeta con sus 12 meses
+    const datasets = tarjetasConDeuda.map(t => {
+      const cfg = tarjetasCfg.find(c => c.tarjeta === t);
+      const color = (cfg && cfg.color) ? cfg.color : (TARJETA_COLORS[t] || '#666');
+      const mesesData = [];
+      for (let i = 0; i < 12; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth()+i, 1);
+        const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        const totalARS = getCuotasMesForTarjeta(ym, t);
+        const total = prefMoneda === 'USD' ? (totalARS / dolarHoy) : totalARS;
+        const label = `${MESES_SHORT[d.getMonth()]} ${d.getFullYear().toString().slice(-2)}`;
+        mesesData.push({ label, value: total });
+      }
+      return { label: t, data: mesesData, color };
+    });
 
     document.getElementById('deu-grafico').innerHTML =
       '<div class="chart-container" style="height:150px"><canvas id="deuChart"></canvas></div>';
     const ctx = document.getElementById('deuChart');
-    deuChart = drawLineChart(ctx, deuChart, [{ label: 'Cuotas', data: mesesData, color: '#185FA5' }]);
+    deuChart = drawLineChart(ctx, deuChart, datasets, { style: 'metrics' });
+    deuChart = drawLineChart(ctx, deuChart, datasets);
   } else {
     grafCard.style.display = 'none';
   }
@@ -2929,7 +2948,7 @@ function getEvolutionDataByCategory(cats, months) {
   return datasets;
 }
 
-function drawLineChart(ctx, chartInstance, datasets) {
+function drawLineChart(ctx, chartInstance, datasets, opts) {
 
   if (chartInstance) chartInstance.destroy();
   
@@ -2937,28 +2956,46 @@ function drawLineChart(ctx, chartInstance, datasets) {
   const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
   const textColor = isDark ? '#9b9896' : '#6b6966';
 
-  return new Chart(ctx, {
+    return new Chart(ctx, {
     type: 'line',
     data: {
       labels: datasets[0].data.map(m => m.label),
-      datasets: datasets.map(ds => ({
-        label: ds.label,
-        data: ds.data.map(m => m.value),
-        borderColor: ds.color,
-        backgroundColor: ds.color + '11',
-        fill: true,
-        tension: 0,
-        borderWidth: 3,
-        pointRadius: 2,
-        pointBackgroundColor: ds.color,
-        pointHoverRadius: 4
-      }))
+      datasets: datasets.map(ds => {
+        const isMetrics = (typeof opts !== 'undefined' && opts.style === 'metrics');
+        const labelCount = datasets[0] && datasets[0].data ? datasets[0].data.length : 0;
+        return Object.assign({
+          label: ds.label,
+          data: ds.data.map(m => m.value),
+          borderColor: ds.color,
+          backgroundColor: ds.color + '11',
+          tension: 0,
+          borderWidth: 3
+        }, isMetrics ? {
+          fill: false,
+          pointRadius: 4,
+          pointHoverRadius: 4,
+          pointBackgroundColor: ds.color,
+          pointBorderColor: ds.color,
+          pointBorderWidth: 0,
+          borderDash: (ctx) => ctx.index >= (labelCount - 2) ? [5, 5] : [],
+          segment: { borderDash: (ctx) => ctx.p0DataIndex >= (labelCount - 3) ? [5,5] : [] }
+        } : {
+          // Restaurar estilo por defecto: puntos pequeños, rellenos y del color de la serie
+          fill: true,
+          pointRadius: 2,
+          pointStyle: 'circle',
+          pointBackgroundColor: ds.color,
+          pointBorderColor: ds.color,
+          pointBorderWidth: 0,
+          pointHoverRadius: 4
+        });
+      })
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { 
-        legend: { display: datasets.length > 1, labels: { color: textColor } }, 
+        legend: { display: datasets.length > 1, labels: (typeof opts !== 'undefined' && opts.style === 'metrics') ? { color: textColor, font: { size: 10 }, boxWidth: 10 } : { color: textColor, usePointStyle: true, boxWidth: 20 } }, 
         tooltip: { 
           mode: 'index', 
           intersect: false,
