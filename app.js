@@ -605,7 +605,7 @@ function switchTab(t) {
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 
 function renderDashDeudas() {
-  const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
+  const activas = allDeudas.filter(d => getCuotasPagasDeuda(d) < (d.cuotas_total||1));
   if (activas.length === 0) {
     const el = document.getElementById('dash-deudas');
     if (el) el.style.display = 'none';
@@ -2520,6 +2520,7 @@ async function confirmarPagoCuota() {
 
     d.cuotas_pagas = nuevasPagas;
     await loadGastos(); // Recargar para que aparezca en el dash
+    d.cuotas_pagas = getCuotasPagasDeuda(d);
     renderDeudas();
     renderDash();
   } catch (error) {
@@ -2527,28 +2528,72 @@ async function confirmarPagoCuota() {
   }
 }
 
+function getCuotasPagasDeuda(deuda) {
+  // Cuenta cuántas cuotas ya quedaron cubiertas por los pagos asociados
+  // a esta deuda, sin depender del mes en que se hizo el pago.
+  const pagos = (allGastos || []).filter(g => {
+    if (!g) return false;
+    const notas = String(g.notas || '');
+    const desc = String(g.descripcion || '');
+    return (g.categoria === 'Deudas' && (notas.includes(`Deuda ID: ${deuda.id}`) || desc.includes(`Deuda ID: ${deuda.id}`)));
+  });
+
+  if (pagos.length > 0) {
+    const indices = pagos
+      .map(g => {
+        const desc = String(g.descripcion || '');
+        const m = desc.match(/Pago\s*Cuota\s*(\d+)\s*\//i);
+        return m && m[1] ? Number(m[1]) : null;
+      })
+      .filter(n => Number.isInteger(n));
+
+    if (indices.length > 0) return Math.max(...indices);
+    return pagos.length;
+  }
+
+  return Number(deuda.cuotas_pagas || 0);
+}
+
+function getIndicesCuotasPagas(deuda) {
+  const pagos = (allGastos || []).filter(g => {
+    if (!g) return false;
+    const notas = String(g.notas || '');
+    const desc = String(g.descripcion || '');
+    return (g.categoria === 'Deudas' && (notas.includes(`Deuda ID: ${deuda.id}`) || desc.includes(`Deuda ID: ${deuda.id}`)));
+  });
+
+  const indices = new Set();
+  pagos.forEach(g => {
+    const desc = String(g.descripcion || '');
+    const m = desc.match(/Pago\s*Cuota\s*(\d+)\s*\//i);
+    if (m && m[1]) indices.add(Number(m[1]));
+  });
+  return indices;
+}
+
+function getCuotaPendienteParaMes(deuda, yearMonth) {
+  if (!deuda.mes_inicio) return false;
+  const [y, m] = deuda.mes_inicio.split('-').map(Number);
+  const inicio = new Date(y, m - 1, 1);
+  const [ty, tm] = yearMonth.split('-').map(Number);
+  const target = new Date(ty, tm - 1, 1);
+
+  const diffMonths = (target.getFullYear() - inicio.getFullYear()) * 12 + (target.getMonth() - inicio.getMonth());
+  if (diffMonths <= 0) return false;
+
+  const cuotasTotal = deuda.cuotas_total || 1;
+  const cuotaIndex = diffMonths;
+  const cuotasPagas = getCuotasPagasDeuda(deuda);
+
+  return cuotaIndex <= cuotasTotal && cuotaIndex > cuotasPagas;
+}
+
 function getCuotasMes(yearMonth) {
   // yearMonth = 'YYYY-MM'
   return allDeudas.reduce((total, d) => {
-    if (!d.mes_inicio) return total;
-    const [y, m] = d.mes_inicio.split('-').map(Number);
-    const inicio = new Date(y, m-1, 1);
-    const [ty, tm] = yearMonth.split('-').map(Number);
-    const target = new Date(ty, tm-1, 1);
-    
-    // Diferencia en meses
-    const diffMonths = (target.getFullYear() - inicio.getFullYear()) * 12 + (target.getMonth() - inicio.getMonth());
-    
-    const cuotasTotal = d.cuotas_total || 1;
-    
-    if (diffMonths >= 0 && diffMonths < cuotasTotal) {
-      // Solo sumamos si esta cuota aún no fue pagada
-      // diffMonths es el índice de la cuota (0 para el primer mes)
-      // Si cuotas_pagas es 1, significa que la cuota 0 ya se pagó.
-      if (diffMonths >= (d.cuotas_pagas || 0)) {
-        const montoARS = d.moneda === 'USD' ? d.monto_cuota * dolarHoy : d.monto_cuota;
-        return total + parseFloat(montoARS || 0);
-      }
+    if (getCuotaPendienteParaMes(d, yearMonth)) {
+      const montoARS = d.moneda === 'USD' ? d.monto_cuota * dolarHoy : d.monto_cuota;
+      return total + parseFloat(montoARS || 0);
     }
     return total;
   }, 0);
@@ -2583,8 +2628,8 @@ function getProxVencimiento(tarjeta) {
 }
 
 function renderDeudas() {
-  const activas = allDeudas.filter(d => (d.cuotas_pagas||0) < (d.cuotas_total||1));
-  const terminadas = allDeudas.filter(d => (d.cuotas_pagas||0) >= (d.cuotas_total||1));
+  const activas = allDeudas.filter(d => getCuotasPagasDeuda(d) < (d.cuotas_total||1));
+  const terminadas = allDeudas.filter(d => getCuotasPagasDeuda(d) >= (d.cuotas_total||1));
 
   // ── Resumen por tarjeta ──
   const tarjetas = getTarjetas();
@@ -2655,7 +2700,7 @@ function renderDeudas() {
     return;
   }
   lista.innerHTML = [...activas, ...terminadas].map(d => {
-    const pagas = d.cuotas_pagas || 0;
+    const pagas = getCuotasPagasDeuda(d);
     const total = d.cuotas_total || 1;
     const pct = Math.round(pagas/total*100);
     const terminada = pagas >= total;
