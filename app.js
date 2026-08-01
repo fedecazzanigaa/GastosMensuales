@@ -533,6 +533,12 @@ function fmt(n) {
   return (prefMoneda === 'USD' ? 'U$D ' : '$') + parseFloat(val || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); 
 }
 function fdate(d) { return (d || '').split('-').reverse().join('/'); }
+function localDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 function catColor(nombre) { 
   if (nombre === 'Deudas') return '#185FA5';
   return (categorias.find(c => c.nombre === nombre) || { color: '#888' }).color; 
@@ -1078,8 +1084,7 @@ async function agregarAdjuntoAlGasto(gastoId) {
 
 // ─── NUEVO GASTO ─────────────────────────────────────────────────────────────
 function initForm() {
-  const now = new Date();
-  document.getElementById('f-fecha').value = now.toISOString().split('T')[0];
+  document.getElementById('f-fecha').value = localDateInputValue();
   
   // Inicializar valores y construir dropdowns visuales (single-select)
   const fmon = document.getElementById('f-moneda'); if (fmon) fmon.value = prefMoneda;
@@ -1544,7 +1549,10 @@ function msPerToggle(val, event) {
 
 function initHist() {
   const now = new Date();
-  document.getElementById('h-mes').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const monthInput = document.getElementById('h-mes');
+  if (!msInitDone || !monthInput.value) {
+    monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }
   if (!msInitDone) { msCatSel.clear(); msPerSel.clear(); msInitDone = true; }
   buildMsCat();
   buildMsPer();
